@@ -1,6 +1,6 @@
 ---
-name: Issue Template
-about: 'Issues description as follows:'
+name: General Issue Template
+about: For tasks / general issues
 title: ''
 labels: ''
 assignees: ryanleeks
@@ -14,7 +14,8 @@ assignees: ryanleeks
 
 
 ## Tasks / To-do
- 
+
+- [ ] 
 
 ## Tools
 
