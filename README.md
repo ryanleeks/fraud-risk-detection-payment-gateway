@@ -9,8 +9,8 @@ This is the repository of Ryan's final year project: "Developing a Fraud Detecti
 ## Architecture
 
 ### Tech Stack
-**MERN Stack**
-- MongoDB
+**PERN Stack**
+- PostgreSQL
 - Express.js
 - Next.js (React)
 - Node.js
