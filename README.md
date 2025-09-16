@@ -30,8 +30,10 @@ This is the repository of Ryan's final year project: "Developing a Fraud Detecti
 This project repository is currently unlicensed.
 
 ## Acknowledgments
-Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.
+
 
 No part of this repository — including all source code, designs, and written content — may be copied, reproduced, or distributed without explicit permission.
 
 For licensing or attribution inquiries, please contact: @gmail.com.
+
+Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.
