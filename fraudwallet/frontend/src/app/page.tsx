@@ -1,65 +1,70 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useState } from "react"
+import { DashboardTab } from "@/components/dashboard-tab"
+import { PaymentTab } from "@/components/payment-tab"
+import { ProfileTab } from "@/components/profile-tab"
+import { Home, Send, User } from "lucide-react"
+
+export default function WalletApp() {
+  const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "profile">("dashboard")
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <div className="w-full max-w-md">
+        {/* Mobile App Container */}
+        <div className="relative overflow-hidden rounded-[2.5rem] border-8 border-foreground/10 bg-background shadow-2xl">
+          {/* Status Bar */}
+          <div className="flex items-center justify-between bg-background px-8 py-3 text-xs">
+            <span className="font-medium">9:41</span>
+            <div className="flex items-center gap-1">
+              <div className="h-3 w-3 rounded-full bg-foreground/20" />
+              <div className="h-3 w-3 rounded-full bg-foreground/20" />
+              <div className="h-3 w-3 rounded-full bg-foreground/20" />
+            </div>
+          </div>
+
+          {/* App Content */}
+          <div className="h-[600px] overflow-y-auto bg-background">
+            {activeTab === "dashboard" && <DashboardTab />}
+            {activeTab === "payment" && <PaymentTab />}
+            {activeTab === "profile" && <ProfileTab />}
+          </div>
+
+          {/* Bottom Navigation */}
+          <div className="border-t border-border bg-card">
+            <div className="flex items-center justify-around px-6 py-4">
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Home className="h-6 w-6" />
+                <span className="text-xs font-medium">Home</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("payment")}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeTab === "payment" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Send className="h-6 w-6" />
+                <span className="text-xs font-medium">Payment</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeTab === "profile" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <User className="h-6 w-6" />
+                <span className="text-xs font-medium">Profile</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
-  );
+  )
 }
