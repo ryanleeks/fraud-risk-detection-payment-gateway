@@ -76,7 +76,9 @@ export function ProfileTab() {
       </Button>
 
       {/* App Version */}
-      <p className="text-center text-xs text-muted-foreground">Version 1.0.0</p>
+      <p className="text-center text-xs text-muted-foreground">Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.</p>
+      <p className="text-center text-xs text-muted-foreground">For FYP@APU purpose.</p>
+      <p className="text-center text-xs text-muted-foreground">Version 0.1.0 Alpha Release [Dev]</p>
     </div>
   )
 }
