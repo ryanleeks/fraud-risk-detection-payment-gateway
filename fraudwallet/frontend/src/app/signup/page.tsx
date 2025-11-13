@@ -3,14 +3,18 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Wallet, Mail, Lock, User, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 
 export default function SignupPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -18,10 +22,57 @@ export default function SignupPage() {
     confirmPassword: "",
   })
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle signup logic here
-    console.log("Signup attempt:", formData)
+    setError("")
+
+    // Check if passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    // Check password length
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Call backend API
+      const response = await fetch("http://localhost:8080/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Save token to localStorage
+        localStorage.setItem("token", data.token)
+        localStorage.setItem("user", JSON.stringify(data.user))
+
+        // Show success and redirect to login
+        alert("Account created successfully! Redirecting to login...")
+        router.push("/login")
+      } else {
+        setError(data.message || "Failed to create account")
+      }
+    } catch (err) {
+      console.error("Signup error:", err)
+      setError("Unable to connect to server. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleChange = (field: string, value: string) => {
@@ -157,8 +208,14 @@ export default function SignupPage() {
                   </span>
                 </div>
 
-                <Button type="submit" className="w-full" size="lg">
-                  Create Account
+                {error && (
+                  <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
 

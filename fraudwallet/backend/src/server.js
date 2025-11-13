@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+// Initialize database (this will create the users table)
+const db = require('./database');
+
 // Create Express app
 const app = express();
 
@@ -25,6 +28,11 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Authentication routes
+const auth = require('./auth');
+app.post('/api/auth/signup', auth.signup);
+app.post('/api/auth/login', auth.login);
 
 // Start the server
 const PORT = process.env.PORT || 8080;

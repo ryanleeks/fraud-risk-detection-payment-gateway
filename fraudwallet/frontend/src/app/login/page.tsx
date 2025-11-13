@@ -3,20 +3,57 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Wallet, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle login logic here
-    console.log("Login attempt:", { email, password })
+    setError("")
+    setLoading(true)
+
+    try {
+      // Call backend API
+      const response = await fetch("http://localhost:8080/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Save token to localStorage
+        localStorage.setItem("token", data.token)
+        localStorage.setItem("user", JSON.stringify(data.user))
+
+        // Redirect to dashboard
+        alert("Login successful! Welcome back!")
+        router.push("/")
+      } else {
+        setError(data.message || "Failed to login")
+      }
+    } catch (err) {
+      console.error("Login error:", err)
+      setError("Unable to connect to server. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -101,8 +138,14 @@ export default function LoginPage() {
                   </Link>
                 </div>
 
-                <Button type="submit" className="w-full" size="lg">
-                  Sign In
+                {error && (
+                  <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Signing In..." : "Sign In"}
                 </Button>
               </form>
 
