@@ -2,35 +2,33 @@
 
 /**
  * Validate Malaysian phone number
- * Format: +60 followed by 10-11 digits
- * Examples: +60123456789, +601234567890
+ * Format: 60 followed by 9-10 digits (11-12 digits total)
+ * Examples: 60123456789, 601234567890
+ * Note: User only inputs digits, UI displays +60 prefix
  */
 const validatePhoneNumber = (phone) => {
-  // Remove spaces and dashes
-  const cleanPhone = phone.replace(/[\s-]/g, '');
+  // Remove spaces, dashes, and the "+" symbol
+  let cleanPhone = phone.replace(/[\s\-\+]/g, '');
 
-  // Check if it starts with +60
-  if (!cleanPhone.startsWith('+60')) {
+  // Check if it starts with 60 (Malaysian country code)
+  if (!cleanPhone.startsWith('60')) {
     return {
       valid: false,
-      message: 'Phone number must start with +60 (Malaysia country code)'
+      message: 'Phone number must be a Malaysian number (60XXXXXXXXX)'
     };
   }
 
-  // Remove +60 and check remaining digits
-  const digits = cleanPhone.substring(3);
-
-  // Check if it's 10-11 digits
-  if (!/^\d{10,11}$/.test(digits)) {
+  // Check if length is 11-12 digits total
+  if (!/^60\d{9,10}$/.test(cleanPhone)) {
     return {
       valid: false,
-      message: 'Phone number must have 10-11 digits after +60'
+      message: 'Phone number must be 11-12 digits (60XXXXXXXXX or 60XXXXXXXXXX)'
     };
   }
 
   return {
     valid: true,
-    formatted: cleanPhone
+    formatted: cleanPhone  // Returns digits only: "60123456789"
   };
 };
 
