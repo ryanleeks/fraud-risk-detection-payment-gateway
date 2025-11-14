@@ -34,6 +34,13 @@ const auth = require('./auth');
 app.post('/api/auth/signup', auth.signup);
 app.post('/api/auth/login', auth.login);
 
+// User profile routes (protected - require authentication)
+const user = require('./user');
+const { verifyToken } = require('./middleware');
+app.get('/api/user/profile', verifyToken, user.getProfile);
+app.put('/api/user/profile', verifyToken, user.updateProfile);
+app.post('/api/user/terminate', verifyToken, user.terminateAccount);
+
 // Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

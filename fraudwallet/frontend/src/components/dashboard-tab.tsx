@@ -1,9 +1,20 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet } from "lucide-react"
 
 export function DashboardTab() {
+  const [user, setUser] = useState<any>(null)
+
+  // Load user data from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    }
+  }, [])
+
   const transactions = [
     { id: 1, name: "Sarah Johnson", type: "received", amount: 250.0, date: "Today, 2:30 PM" },
     { id: 2, name: "Coffee Shop", type: "sent", amount: 12.5, date: "Today, 10:15 AM" },
@@ -11,12 +22,20 @@ export function DashboardTab() {
     { id: 4, name: "Grocery Store", type: "sent", amount: 85.3, date: "Yesterday, 11:00 AM" },
   ]
 
+  // Get first name from full name
+  const getFirstName = (fullName: string) => {
+    if (!fullName) return "User"
+    return fullName.split(" ")[0]
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Welcome back</h1>
+          <h1 className="text-2xl font-bold">
+            Welcome back, {user ? getFirstName(user.fullName) : "User"}
+          </h1>
           <p className="text-sm text-muted-foreground">Manage your finances</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">

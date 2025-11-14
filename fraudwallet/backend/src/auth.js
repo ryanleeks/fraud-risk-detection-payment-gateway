@@ -107,6 +107,14 @@ const login = async (req, res) => {
       });
     }
 
+    // Check if account is terminated
+    if (user.account_status === 'terminated') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been terminated'
+      });
+    }
+
     // Check if password matches
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
