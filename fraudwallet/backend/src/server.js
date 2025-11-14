@@ -39,6 +39,7 @@ const user = require('./user');
 const { verifyToken } = require('./middleware');
 app.get('/api/user/profile', verifyToken, user.getProfile);
 app.put('/api/user/profile', verifyToken, user.updateProfile);
+app.put('/api/user/phone', verifyToken, user.changePhoneNumber);
 app.post('/api/user/terminate', verifyToken, user.terminateAccount);
 
 // Start the server

@@ -20,6 +20,8 @@ export function ProfileTab() {
   const [fullName, setFullName] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
+  const [newPhoneNumber, setNewPhoneNumber] = useState("")
+  const [phoneChangePassword, setPhoneChangePassword] = useState("")
   const [terminatePassword, setTerminatePassword] = useState("")
 
   // Load user data from localStorage
@@ -134,6 +136,60 @@ export function ProfileTab() {
       }
     } catch (err) {
       console.error("Change password error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Change phone number handler (Account Settings modal)
+  const handleChangePhoneNumber = async () => {
+    setError("")
+
+    if (!newPhoneNumber || !phoneChangePassword) {
+      setError("Please enter new phone number and password")
+      return
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^\+60\d{10,11}$/
+    if (!phoneRegex.test(newPhoneNumber.replace(/[\s-]/g, ''))) {
+      setError("Phone number must be in format +60XXXXXXXXXX (10-11 digits)")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/phone", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          newPhoneNumber,
+          password: phoneChangePassword
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update localStorage with new phone number
+        const updatedUser = { ...user, phoneNumber: data.phoneNumber }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUser(updatedUser)
+        setNewPhoneNumber("")
+        setPhoneChangePassword("")
+        alert("Phone number changed successfully!")
+      } else {
+        setError(data.message || "Failed to change phone number")
+      }
+    } catch (err) {
+      console.error("Change phone number error:", err)
       setError("Unable to connect to server")
     } finally {
       setLoading(false)
@@ -370,6 +426,48 @@ export function ProfileTab() {
               {/* Divider */}
               <div className="border-t border-border" />
 
+              {/* Change Phone Number Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold">Change Phone Number</h4>
+                <p className="text-sm text-muted-foreground">
+                  Current: {user?.phoneNumber || "Not set"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Note: You can only change your phone number once every 90 days
+                </p>
+
+                <div>
+                  <label className="text-sm font-medium">New Phone Number</label>
+                  <Input
+                    type="tel"
+                    value={newPhoneNumber}
+                    onChange={(e) => setNewPhoneNumber(e.target.value)}
+                    placeholder="+60123456789"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Password</label>
+                  <Input
+                    type="password"
+                    value={phoneChangePassword}
+                    onChange={(e) => setPhoneChangePassword(e.target.value)}
+                    placeholder="Enter your password to confirm"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleChangePhoneNumber}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? "Changing..." : "Change Phone Number"}
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border" />
+
               {/* Terminate Account Section */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-destructive">Danger Zone</h4>
@@ -398,6 +496,8 @@ export function ProfileTab() {
                   setError("")
                   setCurrentPassword("")
                   setNewPassword("")
+                  setNewPhoneNumber("")
+                  setPhoneChangePassword("")
                 }}
                 className="w-full"
               >
