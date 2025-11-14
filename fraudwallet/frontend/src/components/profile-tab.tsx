@@ -151,10 +151,12 @@ export function ProfileTab() {
       return
     }
 
-    // Validate phone number format
-    const phoneRegex = /^\+60\d{10,11}$/
-    if (!phoneRegex.test(newPhoneNumber.replace(/[\s-]/g, ''))) {
-      setError("Phone number must be in format +60XXXXXXXXXX (10-11 digits)")
+    // Validate phone number format (user inputs 9-10 digits, we prepend "60")
+    const phoneDigits = newPhoneNumber.replace(/[\s\-\+]/g, '')
+    const fullPhone = phoneDigits.startsWith('60') ? phoneDigits : `60${phoneDigits}`
+    const phoneRegex = /^60\d{9,10}$/
+    if (!phoneRegex.test(fullPhone)) {
+      setError("Phone number must be 9-10 digits (Malaysian number)")
       return
     }
 
@@ -170,7 +172,7 @@ export function ProfileTab() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          newPhoneNumber,
+          newPhoneNumber: fullPhone,  // Send complete phone with "60" prefix
           password: phoneChangePassword
         })
       })
@@ -430,7 +432,7 @@ export function ProfileTab() {
               <div className="space-y-4">
                 <h4 className="font-semibold">Change Phone Number</h4>
                 <p className="text-sm text-muted-foreground">
-                  Current: {user?.phoneNumber || "Not set"}
+                  Current: +{user?.phoneNumber || "Not set"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Note: You can only change your phone number once every 90 days
@@ -438,12 +440,27 @@ export function ProfileTab() {
 
                 <div>
                   <label className="text-sm font-medium">New Phone Number</label>
-                  <Input
-                    type="tel"
-                    value={newPhoneNumber}
-                    onChange={(e) => setNewPhoneNumber(e.target.value)}
-                    placeholder="+60123456789"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      +60
+                    </span>
+                    <Input
+                      type="tel"
+                      value={newPhoneNumber}
+                      onChange={(e) => {
+                        // Remove any non-digit characters and remove "60" prefix if user types it
+                        let value = e.target.value.replace(/\D/g, '')
+                        if (value.startsWith('60')) {
+                          value = value.substring(2)
+                        }
+                        setNewPhoneNumber(value)
+                      }}
+                      placeholder="123456789"
+                      className="pl-12"
+                      maxLength={10}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Enter 9-10 digits (Malaysian number)</p>
                 </div>
 
                 <div>

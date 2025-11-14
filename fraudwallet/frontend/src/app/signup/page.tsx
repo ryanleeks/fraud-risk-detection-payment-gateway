@@ -27,10 +27,12 @@ export default function SignupPage() {
     e.preventDefault()
     setError("")
 
-    // Validate phone number format
-    const phoneRegex = /^\+60\d{10,11}$/
-    if (!phoneRegex.test(formData.phoneNumber.replace(/[\s-]/g, ''))) {
-      setError("Phone number must be in format +60XXXXXXXXXX (10-11 digits)")
+    // Validate phone number format (user inputs 9-10 digits, we prepend "60")
+    const phoneDigits = formData.phoneNumber.replace(/[\s\-\+]/g, '')
+    const fullPhone = phoneDigits.startsWith('60') ? phoneDigits : `60${phoneDigits}`
+    const phoneRegex = /^60\d{9,10}$/
+    if (!phoneRegex.test(fullPhone)) {
+      setError("Phone number must be 9-10 digits (Malaysian number)")
       return
     }
 
@@ -58,7 +60,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
-          phoneNumber: formData.phoneNumber,
+          phoneNumber: fullPhone,  // Send complete phone with "60" prefix
           password: formData.password,
         }),
       })
@@ -159,17 +161,28 @@ export default function SignupPage() {
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <span className="absolute left-10 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      +60
+                    </span>
                     <Input
                       id="phoneNumber"
                       type="tel"
-                      placeholder="+60123456789"
+                      placeholder="123456789"
                       value={formData.phoneNumber}
-                      onChange={(e) => handleChange("phoneNumber", e.target.value)}
-                      className="pl-10"
+                      onChange={(e) => {
+                        // Remove any non-digit characters and remove "60" prefix if user types it
+                        let value = e.target.value.replace(/\D/g, '')
+                        if (value.startsWith('60')) {
+                          value = value.substring(2)
+                        }
+                        handleChange("phoneNumber", value)
+                      }}
+                      className="pl-16"
                       required
+                      maxLength={10}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Format: +60 followed by 10-11 digits</p>
+                  <p className="text-xs text-muted-foreground">Enter 9-10 digits (Malaysian number)</p>
                 </div>
 
                 <div className="space-y-2">
