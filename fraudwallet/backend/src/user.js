@@ -1,6 +1,7 @@
 // User profile management
 const bcrypt = require('bcrypt');
 const db = require('./database');
+const { validatePhoneNumber, canChangePhone } = require('./validation');
 
 const SALT_ROUNDS = 10;
 
@@ -14,7 +15,7 @@ const getProfile = (req, res) => {
 
     // Get user from database (exclude password)
     const user = db.prepare(`
-      SELECT id, full_name, email, account_status, created_at, updated_at
+      SELECT id, full_name, email, phone_number, phone_last_changed, account_status, created_at, updated_at
       FROM users
       WHERE id = ?
     `).get(userId);
@@ -32,6 +33,8 @@ const getProfile = (req, res) => {
         id: user.id,
         fullName: user.full_name,
         email: user.email,
+        phoneNumber: user.phone_number,
+        phoneLastChanged: user.phone_last_changed,
         accountStatus: user.account_status,
         createdAt: user.created_at,
         updatedAt: user.updated_at
@@ -212,8 +215,108 @@ const terminateAccount = (req, res) => {
   }
 };
 
+/**
+ * CHANGE PHONE NUMBER
+ * Users can change their phone number once every 90 days
+ */
+const changePhoneNumber = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { newPhoneNumber, password } = req.body;
+
+    if (!newPhoneNumber || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number and password are required'
+      });
+    }
+
+    // Validate phone number format
+    const phoneValidation = validatePhoneNumber(newPhoneNumber);
+    if (!phoneValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: phoneValidation.message
+      });
+    }
+
+    // Get current user data
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password'
+      });
+    }
+
+    // Check if new phone is same as current
+    if (user.phone_number === phoneValidation.formatted) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is already your current phone number'
+      });
+    }
+
+    // Check if phone number is already used by another user
+    const existingPhone = db.prepare('SELECT * FROM users WHERE phone_number = ? AND id != ?')
+      .get(phoneValidation.formatted, userId);
+
+    if (existingPhone) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already registered to another account'
+      });
+    }
+
+    // Check if user can change phone (90-day restriction)
+    const changeCheck = canChangePhone(user.phone_last_changed);
+    if (!changeCheck.canChange) {
+      return res.status(403).json({
+        success: false,
+        message: changeCheck.message,
+        daysRemaining: changeCheck.daysRemaining
+      });
+    }
+
+    // Update phone number
+    db.prepare(`
+      UPDATE users
+      SET phone_number = ?,
+          phone_last_changed = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(phoneValidation.formatted, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone number updated successfully',
+      phoneNumber: phoneValidation.formatted
+    });
+
+    console.log(`✅ User ${userId} changed phone number`);
+
+  } catch (error) {
+    console.error('❌ Change phone number error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error changing phone number'
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
-  terminateAccount
+  terminateAccount,
+  changePhoneNumber
 };

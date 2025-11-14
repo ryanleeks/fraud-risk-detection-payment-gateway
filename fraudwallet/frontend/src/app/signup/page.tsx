@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Wallet, Mail, Lock, User, Eye, EyeOff } from "lucide-react"
+import { Wallet, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react"
 import Link from "next/link"
 
 export default function SignupPage() {
@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
+    phoneNumber: "",
     password: "",
     confirmPassword: "",
   })
@@ -25,6 +26,13 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    // Validate phone number format
+    const phoneRegex = /^\+60\d{10,11}$/
+    if (!phoneRegex.test(formData.phoneNumber.replace(/[\s-]/g, ''))) {
+      setError("Phone number must be in format +60XXXXXXXXXX (10-11 digits)")
+      return
+    }
 
     // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
@@ -50,6 +58,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
+          phoneNumber: formData.phoneNumber,
           password: formData.password,
         }),
       })
@@ -142,6 +151,25 @@ export default function SignupPage() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="phoneNumber" className="text-sm font-medium">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      placeholder="+60123456789"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleChange("phoneNumber", e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Format: +60 followed by 10-11 digits</p>
                 </div>
 
                 <div className="space-y-2">

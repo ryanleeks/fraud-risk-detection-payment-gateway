@@ -19,6 +19,8 @@ const createUsersTable = () => {
       full_name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      phone_number TEXT NOT NULL,
+      phone_last_changed DATETIME DEFAULT CURRENT_TIMESTAMP,
       account_status TEXT DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -28,17 +30,27 @@ const createUsersTable = () => {
   db.exec(sql);
   console.log('✅ Users table is ready');
 
-  // Add account_status column if it doesn't exist (for existing databases)
+  // Add missing columns if they don't exist (for existing databases)
   try {
     const columns = db.prepare("PRAGMA table_info(users)").all();
-    const hasAccountStatus = columns.some(col => col.name === 'account_status');
+    const columnNames = columns.map(col => col.name);
 
-    if (!hasAccountStatus) {
+    if (!columnNames.includes('account_status')) {
       db.exec("ALTER TABLE users ADD COLUMN account_status TEXT DEFAULT 'active'");
-      console.log('✅ Added account_status column to existing users table');
+      console.log('✅ Added account_status column');
+    }
+
+    if (!columnNames.includes('phone_number')) {
+      db.exec("ALTER TABLE users ADD COLUMN phone_number TEXT");
+      console.log('✅ Added phone_number column');
+    }
+
+    if (!columnNames.includes('phone_last_changed')) {
+      db.exec("ALTER TABLE users ADD COLUMN phone_last_changed DATETIME DEFAULT CURRENT_TIMESTAMP");
+      console.log('✅ Added phone_last_changed column');
     }
   } catch (error) {
-    // Column might already exist, ignore error
+    console.error('Error adding columns:', error.message);
   }
 };
 

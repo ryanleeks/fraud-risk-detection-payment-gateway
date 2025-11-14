@@ -2,6 +2,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const { validatePhoneNumber } = require('./validation');
 
 // How many times to encrypt the password (higher = more secure but slower)
 const SALT_ROUNDS = 10;
@@ -16,17 +17,26 @@ const SALT_ROUNDS = 10;
  */
 const signup = async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, phoneNumber } = req.body;
 
     // Validate input
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !phoneNumber) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide full name, email, and password'
+        message: 'Please provide full name, email, password, and phone number'
       });
     }
 
-    // Check if user already exists
+    // Validate phone number
+    const phoneValidation = validatePhoneNumber(phoneNumber);
+    if (!phoneValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: phoneValidation.message
+      });
+    }
+
+    // Check if email already exists
     const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
     if (existingUser) {
@@ -36,16 +46,26 @@ const signup = async (req, res) => {
       });
     }
 
+    // Check if phone number already exists
+    const existingPhone = db.prepare('SELECT * FROM users WHERE phone_number = ?').get(phoneValidation.formatted);
+
+    if (existingPhone) {
+      return res.status(409).json({
+        success: false,
+        message: 'Phone number already registered'
+      });
+    }
+
     // Hash the password (encrypt it so we don't store plain text)
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     // Insert new user into database
     const insertUser = db.prepare(`
-      INSERT INTO users (full_name, email, password_hash)
-      VALUES (?, ?, ?)
+      INSERT INTO users (full_name, email, password_hash, phone_number, phone_last_changed)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
 
-    const result = insertUser.run(fullName, email, passwordHash);
+    const result = insertUser.run(fullName, email, passwordHash, phoneValidation.formatted);
     const userId = result.lastInsertRowid;
 
     // Create JWT token (like a digital passport)
@@ -63,7 +83,8 @@ const signup = async (req, res) => {
       user: {
         id: userId,
         fullName,
-        email
+        email,
+        phoneNumber: phoneValidation.formatted
       }
     });
 
