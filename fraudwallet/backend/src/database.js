@@ -46,7 +46,9 @@ const createUsersTable = () => {
     }
 
     if (!columnNames.includes('phone_last_changed')) {
-      db.exec("ALTER TABLE users ADD COLUMN phone_last_changed DATETIME DEFAULT CURRENT_TIMESTAMP");
+      db.exec("ALTER TABLE users ADD COLUMN phone_last_changed DATETIME");
+      // Set default value for existing rows
+      db.exec("UPDATE users SET phone_last_changed = CURRENT_TIMESTAMP WHERE phone_last_changed IS NULL");
       console.log('✅ Added phone_last_changed column');
     }
   } catch (error) {
