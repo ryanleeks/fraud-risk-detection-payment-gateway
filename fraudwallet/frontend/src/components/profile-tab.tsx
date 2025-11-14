@@ -11,6 +11,7 @@ export function ProfileTab() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showAccountSettings, setShowAccountSettings] = useState(false)
   const [showTerminateModal, setShowTerminateModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -49,28 +50,19 @@ export function ProfileTab() {
     router.push("/login")
   }
 
-  // Update profile handler
+  // Update profile name handler (Edit Profile modal)
   const handleUpdateProfile = async () => {
     setError("")
+
+    if (fullName.trim() === user.fullName) {
+      setShowEditModal(false)
+      return
+    }
+
     setLoading(true)
 
     try {
       const token = localStorage.getItem("token")
-      const updateData: any = {}
-
-      if (fullName.trim() !== user.fullName) {
-        updateData.fullName = fullName.trim()
-      }
-
-      if (newPassword) {
-        if (!currentPassword) {
-          setError("Current password is required to change password")
-          setLoading(false)
-          return
-        }
-        updateData.currentPassword = currentPassword
-        updateData.newPassword = newPassword
-      }
 
       const response = await fetch("http://localhost:8080/api/user/profile", {
         method: "PUT",
@@ -78,7 +70,7 @@ export function ProfileTab() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify({ fullName: fullName.trim() })
       })
 
       const data = await response.json()
@@ -88,14 +80,60 @@ export function ProfileTab() {
         localStorage.setItem("user", JSON.stringify(data.user))
         setUser(data.user)
         setShowEditModal(false)
-        setCurrentPassword("")
-        setNewPassword("")
-        alert("Profile updated successfully!")
+        alert("Name updated successfully!")
       } else {
         setError(data.message || "Failed to update profile")
       }
     } catch (err) {
       console.error("Update profile error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Change password handler (Account Settings modal)
+  const handleChangePassword = async () => {
+    setError("")
+
+    if (!currentPassword || !newPassword) {
+      setError("Please enter both current and new password")
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setCurrentPassword("")
+        setNewPassword("")
+        alert("Password changed successfully!")
+      } else {
+        setError(data.message || "Failed to change password")
+      }
+    } catch (err) {
+      console.error("Change password error:", err)
       setError("Unable to connect to server")
     } finally {
       setLoading(false)
@@ -199,6 +237,12 @@ export function ProfileTab() {
           <Card
             key={index}
             className="flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-muted"
+            onClick={() => {
+              if (item.label === "Account Settings") {
+                setShowAccountSettings(true)
+              }
+              // Other menu items can be added later
+            }}
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -225,23 +269,12 @@ export function ProfileTab() {
         Log Out
       </Button>
 
-      {/* Terminate Account Button */}
-      <Button
-        variant="outline"
-        className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent border-destructive"
-        size="sm"
-        onClick={() => setShowTerminateModal(true)}
-      >
-        <UserX className="mr-2 h-4 w-4" />
-        Terminate Account
-      </Button>
-
       {/* App Version */}
       <p className="text-center text-xs text-muted-foreground">Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.</p>
       <p className="text-center text-xs text-muted-foreground">For FYP@APU purpose.</p>
       <p className="text-center text-xs text-muted-foreground">Version 0.1.0 Alpha Release [Dev]</p>
 
-      {/* Edit Profile Modal */}
+      {/* Edit Profile Modal - Name Only */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
@@ -263,47 +296,113 @@ export function ProfileTab() {
                 />
               </div>
 
-              <div>
-                <label className="text-sm font-medium">Current Password (optional)</label>
-                <Input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">New Password (optional)</label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                />
-              </div>
-
               <div className="flex gap-2">
                 <Button
                   onClick={handleUpdateProfile}
                   disabled={loading}
                   className="flex-1"
                 >
-                  {loading ? "Updating..." : "Update Profile"}
+                  {loading ? "Updating..." : "Update Name"}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setShowEditModal(false)
                     setError("")
-                    setCurrentPassword("")
-                    setNewPassword("")
+                    setFullName(user.fullName)
                   }}
                   disabled={loading}
                 >
                   Cancel
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account Settings Modal - Password & Terminate Account */}
+      {showAccountSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold">Account Settings</h3>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Change Password Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold">Change Password</h4>
+
+                <div>
+                  <label className="text-sm font-medium">Current Password</label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">New Password</label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 6 characters)"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? "Changing..." : "Change Password"}
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-border" />
+
+              {/* Terminate Account Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-destructive">Danger Zone</h4>
+                <p className="text-sm text-muted-foreground">
+                  Terminating your account will prevent you from logging in. Your data will remain in our system for record keeping.
+                </p>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowAccountSettings(false)
+                    setShowTerminateModal(true)
+                  }}
+                  className="w-full"
+                >
+                  <UserX className="mr-2 h-4 w-4" />
+                  Terminate Account
+                </Button>
+              </div>
+
+              {/* Close Button */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAccountSettings(false)
+                  setError("")
+                  setCurrentPassword("")
+                  setNewPassword("")
+                }}
+                className="w-full"
+              >
+                Close
+              </Button>
             </div>
           </div>
         </div>
