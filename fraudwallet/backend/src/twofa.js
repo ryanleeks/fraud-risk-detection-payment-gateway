@@ -68,7 +68,7 @@ const verifyCode = (userId, code, purpose = 'login') => {
 const createTransporter = async () => {
   // Check if custom SMTP settings are in environment variables
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT || 587,
       secure: process.env.SMTP_SECURE === 'true',
@@ -88,7 +88,7 @@ const createTransporter = async () => {
   console.log('   SMTP_PASS=your-app-password');
 
   const testAccount = await nodemailer.createTestAccount();
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: 'smtp.ethereal.email',
     port: 587,
     secure: false,
