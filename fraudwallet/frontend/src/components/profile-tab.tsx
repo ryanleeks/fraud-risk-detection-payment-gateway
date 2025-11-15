@@ -186,9 +186,9 @@ export function ProfileTab() {
         setUser(updatedUser)
         setNewPhoneNumber("")
         setPhoneChangePassword("")
-        alert("Phone number changed successfully!")
+        alert(data.message || "Phone number updated successfully!")
       } else {
-        setError(data.message || "Failed to change phone number")
+        setError(data.message || "Failed to update phone number")
       }
     } catch (err) {
       console.error("Change phone number error:", err)
@@ -267,6 +267,9 @@ export function ProfileTab() {
         <div>
           <h2 className="text-2xl font-bold">{user.fullName}</h2>
           <p className="text-sm text-muted-foreground">{user.email}</p>
+          {user.phoneNumber && (
+            <p className="text-sm text-muted-foreground">+{user.phoneNumber}</p>
+          )}
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
           Edit Profile
@@ -428,18 +431,26 @@ export function ProfileTab() {
               {/* Divider */}
               <div className="border-t border-border" />
 
-              {/* Change Phone Number Section */}
+              {/* Change/Add Phone Number Section */}
               <div className="space-y-4">
-                <h4 className="font-semibold">Change Phone Number</h4>
-                <p className="text-sm text-muted-foreground">
-                  Current: +{user?.phoneNumber || "Not set"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Note: You can only change your phone number once every 90 days
-                </p>
+                <h4 className="font-semibold">
+                  {user?.phoneNumber ? "Change Phone Number" : "Add Phone Number"}
+                </h4>
+                {user?.phoneNumber && (
+                  <p className="text-sm text-muted-foreground">
+                    Current: +{user.phoneNumber}
+                  </p>
+                )}
+                {user?.phoneNumber && (
+                  <p className="text-xs text-muted-foreground">
+                    Note: You can only change your phone number once every 90 days
+                  </p>
+                )}
 
                 <div>
-                  <label className="text-sm font-medium">New Phone Number</label>
+                  <label className="text-sm font-medium">
+                    {user?.phoneNumber ? "New Phone Number" : "Phone Number"}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                       +60
@@ -478,7 +489,9 @@ export function ProfileTab() {
                   disabled={loading}
                   className="w-full"
                 >
-                  {loading ? "Changing..." : "Change Phone Number"}
+                  {loading
+                    ? (user?.phoneNumber ? "Changing..." : "Adding...")
+                    : (user?.phoneNumber ? "Change Phone Number" : "Add Phone Number")}
                 </Button>
               </div>
 
