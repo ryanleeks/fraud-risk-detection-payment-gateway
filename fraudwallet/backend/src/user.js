@@ -259,8 +259,8 @@ const changePhoneNumber = async (req, res) => {
       });
     }
 
-    // Check if new phone is same as current
-    if (user.phone_number === phoneValidation.formatted) {
+    // Check if new phone is same as current (only if user already has a phone)
+    if (user.phone_number && user.phone_number === phoneValidation.formatted) {
       return res.status(400).json({
         success: false,
         message: 'This is already your current phone number'
@@ -278,14 +278,16 @@ const changePhoneNumber = async (req, res) => {
       });
     }
 
-    // Check if user can change phone (90-day restriction)
-    const changeCheck = canChangePhone(user.phone_last_changed);
-    if (!changeCheck.canChange) {
-      return res.status(403).json({
-        success: false,
-        message: changeCheck.message,
-        daysRemaining: changeCheck.daysRemaining
-      });
+    // Check if user can change phone (90-day restriction) - only if they already have a phone
+    if (user.phone_number) {
+      const changeCheck = canChangePhone(user.phone_last_changed);
+      if (!changeCheck.canChange) {
+        return res.status(403).json({
+          success: false,
+          message: changeCheck.message,
+          daysRemaining: changeCheck.daysRemaining
+        });
+      }
     }
 
     // Update phone number
@@ -297,13 +299,15 @@ const changePhoneNumber = async (req, res) => {
       WHERE id = ?
     `).run(phoneValidation.formatted, userId);
 
+    const wasAdded = !user.phone_number; // true if this is the first time adding a phone
+
     res.status(200).json({
       success: true,
-      message: 'Phone number updated successfully',
+      message: wasAdded ? 'Phone number added successfully' : 'Phone number updated successfully',
       phoneNumber: phoneValidation.formatted
     });
 
-    console.log(`✅ User ${userId} changed phone number`);
+    console.log(`✅ User ${userId} ${wasAdded ? 'added' : 'changed'} phone number`);
 
   } catch (error) {
     console.error('❌ Change phone number error:', error);
