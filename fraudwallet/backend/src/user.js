@@ -2,6 +2,7 @@
 const bcrypt = require('bcrypt');
 const db = require('./database');
 const { validatePhoneNumber, canChangePhone } = require('./validation');
+const { generateCode, storeCode, sendEmailCode, sendSMSCode } = require('./twofa');
 
 const SALT_ROUNDS = 10;
 
@@ -318,9 +319,206 @@ const changePhoneNumber = async (req, res) => {
   }
 };
 
+/**
+ * TOGGLE 2FA
+ * Enable or disable two-factor authentication
+ */
+const toggle2FA = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { enabled, password } = req.body;
+
+    if (typeof enabled !== 'boolean' || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide enabled status and password'
+      });
+    }
+
+    // Get user
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password'
+      });
+    }
+
+    // Update 2FA status
+    db.prepare('UPDATE users SET twofa_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(enabled ? 1 : 0, userId);
+
+    res.status(200).json({
+      success: true,
+      message: `2FA ${enabled ? 'enabled' : 'disabled'} successfully`,
+      twofaEnabled: enabled
+    });
+
+    console.log(`✅ User ${userId} ${enabled ? 'enabled' : 'disabled'} 2FA`);
+
+  } catch (error) {
+    console.error('❌ Toggle 2FA error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating 2FA settings'
+    });
+  }
+};
+
+/**
+ * UPDATE 2FA METHOD
+ * Change 2FA method between email and phone
+ */
+const update2FAMethod = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { method, password } = req.body;
+
+    if (!method || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide method and password'
+      });
+    }
+
+    if (method !== 'email' && method !== 'phone') {
+      return res.status(400).json({
+        success: false,
+        message: 'Method must be "email" or "phone"'
+      });
+    }
+
+    // Get user
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password'
+      });
+    }
+
+    // Check if phone method is selected but user has no phone
+    if (method === 'phone' && !user.phone_number) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please add a phone number before enabling phone-based 2FA'
+      });
+    }
+
+    // Update 2FA method
+    db.prepare('UPDATE users SET twofa_method = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(method, userId);
+
+    res.status(200).json({
+      success: true,
+      message: `2FA method updated to ${method}`,
+      twofaMethod: method
+    });
+
+    console.log(`✅ User ${userId} changed 2FA method to ${method}`);
+
+  } catch (error) {
+    console.error('❌ Update 2FA method error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating 2FA method'
+    });
+  }
+};
+
+/**
+ * SEND 2FA TEST CODE
+ * Send a test verification code to user's email or phone
+ */
+const send2FATest = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { method } = req.body;
+
+    if (!method || (method !== 'email' && method !== 'phone')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please specify method: "email" or "phone"'
+      });
+    }
+
+    // Get user
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if phone method is selected but user has no phone
+    if (method === 'phone' && !user.phone_number) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please add a phone number first'
+      });
+    }
+
+    // Generate and send test code
+    const code = generateCode();
+    storeCode(user.id, code, 'test');
+
+    // Send code based on method
+    if (method === 'email') {
+      await sendEmailCode(user.email, user.full_name, code);
+    } else if (method === 'phone') {
+      const smsResult = await sendSMSCode(user.phone_number, code);
+      if (!smsResult.success) {
+        return res.status(400).json({
+          success: false,
+          message: smsResult.error
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Test code sent to your ${method}`
+    });
+
+    console.log(`✅ Test 2FA code sent to user ${userId} via ${method}`);
+
+  } catch (error) {
+    console.error('❌ Send 2FA test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending test code'
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
   terminateAccount,
-  changePhoneNumber
+  changePhoneNumber,
+  toggle2FA,
+  update2FAMethod,
+  send2FATest
 };

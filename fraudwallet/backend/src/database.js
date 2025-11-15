@@ -22,6 +22,8 @@ const createUsersTable = () => {
       phone_number TEXT NOT NULL,
       phone_last_changed DATETIME DEFAULT CURRENT_TIMESTAMP,
       account_status TEXT DEFAULT 'active',
+      twofa_enabled INTEGER DEFAULT 0,
+      twofa_method TEXT DEFAULT 'email',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -51,15 +53,45 @@ const createUsersTable = () => {
       db.exec("UPDATE users SET phone_last_changed = CURRENT_TIMESTAMP WHERE phone_last_changed IS NULL");
       console.log('✅ Added phone_last_changed column');
     }
+
+    if (!columnNames.includes('twofa_enabled')) {
+      db.exec("ALTER TABLE users ADD COLUMN twofa_enabled INTEGER DEFAULT 0");
+      console.log('✅ Added twofa_enabled column');
+    }
+
+    if (!columnNames.includes('twofa_method')) {
+      db.exec("ALTER TABLE users ADD COLUMN twofa_method TEXT DEFAULT 'email'");
+      console.log('✅ Added twofa_method column');
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }
+};
+
+// Create verification codes table
+const createVerificationCodesTable = () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS verification_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      code TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NOT NULL,
+      used INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `;
+
+  db.exec(sql);
+  console.log('✅ Verification codes table is ready');
 };
 
 // Initialize database
 const initDatabase = () => {
   try {
     createUsersTable();
+    createVerificationCodesTable();
     console.log('🎉 Database initialized successfully!');
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);
