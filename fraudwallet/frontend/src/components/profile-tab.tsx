@@ -12,9 +12,11 @@ export function ProfileTab() {
   const [user, setUser] = useState<any>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAccountSettings, setShowAccountSettings] = useState(false)
+  const [showSecuritySettings, setShowSecuritySettings] = useState(false)
   const [showTerminateModal, setShowTerminateModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
 
   // Form states
   const [fullName, setFullName] = useState("")
@@ -23,6 +25,11 @@ export function ProfileTab() {
   const [newPhoneNumber, setNewPhoneNumber] = useState("")
   const [phoneChangePassword, setPhoneChangePassword] = useState("")
   const [terminatePassword, setTerminatePassword] = useState("")
+
+  // 2FA states
+  const [twofaPassword, setTwofaPassword] = useState("")
+  const [twofaMethodPassword, setTwofaMethodPassword] = useState("")
+  const [selectedTwofaMethod, setSelectedTwofaMethod] = useState("email")
 
   // Load user data from localStorage
   useEffect(() => {
@@ -242,6 +249,125 @@ export function ProfileTab() {
     }
   }
 
+  // Toggle 2FA handler
+  const handleToggle2FA = async (enabled: boolean) => {
+    if (!twofaPassword) {
+      setError("Password is required to change 2FA settings")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    setSuccessMessage("")
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/2fa/toggle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ enabled, password: twofaPassword })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update user in localStorage
+        const updatedUser = { ...user, twofaEnabled: data.twofaEnabled }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUser(updatedUser)
+        setTwofaPassword("")
+        setSuccessMessage(data.message)
+      } else {
+        setError(data.message || "Failed to update 2FA settings")
+      }
+    } catch (err) {
+      console.error("Toggle 2FA error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Update 2FA method handler
+  const handleUpdate2FAMethod = async () => {
+    if (!twofaMethodPassword) {
+      setError("Password is required to change 2FA method")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    setSuccessMessage("")
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/2fa/method", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ method: selectedTwofaMethod, password: twofaMethodPassword })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update user in localStorage
+        const updatedUser = { ...user, twofaMethod: data.twofaMethod }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUser(updatedUser)
+        setTwofaMethodPassword("")
+        setSuccessMessage(data.message)
+      } else {
+        setError(data.message || "Failed to update 2FA method")
+      }
+    } catch (err) {
+      console.error("Update 2FA method error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Send test 2FA code handler
+  const handleSendTest2FA = async (method: string) => {
+    setLoading(true)
+    setError("")
+    setSuccessMessage("")
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/2fa/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ method })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccessMessage(data.message)
+      } else {
+        setError(data.message || "Failed to send test code")
+      }
+    } catch (err) {
+      console.error("Send test 2FA error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const menuItems = [
     { icon: Settings, label: "Account Settings", description: "Manage your account" },
     { icon: Bell, label: "Notifications", description: "Alerts and updates" },
@@ -301,6 +427,8 @@ export function ProfileTab() {
             onClick={() => {
               if (item.label === "Account Settings") {
                 setShowAccountSettings(true)
+              } else if (item.label === "Security") {
+                setShowSecuritySettings(true)
               }
               // Other menu items can be added later
             }}
@@ -586,6 +714,209 @@ export function ProfileTab() {
                   Cancel
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security Settings Modal - 2FA Management */}
+      {showSecuritySettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="mb-4 text-xl font-bold">Security Settings</h3>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 rounded-lg bg-green-500/10 p-3 text-sm text-green-600">
+                {successMessage}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Two-Factor Authentication Toggle */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold">Two-Factor Authentication (2FA)</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Add an extra layer of security to your account
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">
+                      2FA is {user?.twofaEnabled ? "Enabled" : "Disabled"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.twofaEnabled
+                        ? `Method: ${user.twofaMethod === "email" ? "Email" : "Phone"}`
+                        : "Protect your account with 2FA"}
+                    </p>
+                  </div>
+                  <div
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${
+                      user?.twofaEnabled ? "bg-primary" : "bg-muted-foreground/30"
+                    }`}
+                    onClick={() => {
+                      if (!twofaPassword && !user?.twofaEnabled) {
+                        setError("Please enter your password below to enable 2FA")
+                        return
+                      }
+                      handleToggle2FA(!user?.twofaEnabled)
+                    }}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        user?.twofaEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Password</label>
+                  <Input
+                    type="password"
+                    value={twofaPassword}
+                    onChange={(e) => setTwofaPassword(e.target.value)}
+                    placeholder="Enter your password to enable/disable 2FA"
+                  />
+                </div>
+              </div>
+
+              {/* 2FA Method Selection - Only show if 2FA is enabled */}
+              {user?.twofaEnabled && (
+                <>
+                  <div className="border-t border-border" />
+
+                  <div className="space-y-4">
+                    <h4 className="font-semibold">2FA Method</h4>
+
+                    <div className="space-y-2">
+                      <div
+                        className={`cursor-pointer rounded-lg border-2 p-3 ${
+                          selectedTwofaMethod === "email"
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
+                        onClick={() => setSelectedTwofaMethod("email")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">Email Verification</p>
+                            <p className="text-xs text-muted-foreground">
+                              Free - Receive codes via email
+                            </p>
+                          </div>
+                          <div
+                            className={`h-4 w-4 rounded-full border-2 ${
+                              selectedTwofaMethod === "email"
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        className={`cursor-pointer rounded-lg border-2 p-3 ${
+                          selectedTwofaMethod === "phone"
+                            ? "border-primary bg-primary/5"
+                            : "border-border"
+                        }`}
+                        onClick={() => setSelectedTwofaMethod("phone")}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">Phone/SMS Verification</p>
+                            <p className="text-xs text-destructive">
+                              ⚠️ Requires paid SMS service (Not implemented)
+                            </p>
+                          </div>
+                          <div
+                            className={`h-4 w-4 rounded-full border-2 ${
+                              selectedTwofaMethod === "phone"
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedTwofaMethod !== user?.twofaMethod && (
+                      <>
+                        <div>
+                          <label className="text-sm font-medium">Password</label>
+                          <Input
+                            type="password"
+                            value={twofaMethodPassword}
+                            onChange={(e) => setTwofaMethodPassword(e.target.value)}
+                            placeholder="Enter your password to change method"
+                          />
+                        </div>
+
+                        <Button
+                          onClick={handleUpdate2FAMethod}
+                          disabled={loading}
+                          className="w-full"
+                        >
+                          {loading ? "Updating..." : "Update Method"}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Test 2FA */}
+                  <div className="border-t border-border" />
+
+                  <div className="space-y-4">
+                    <h4 className="font-semibold">Test 2FA</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Send a test verification code to verify your setup
+                    </p>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleSendTest2FA("email")}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        Test Email
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleSendTest2FA("phone")}
+                        disabled={loading || !user?.phoneNumber}
+                        className="flex-1"
+                      >
+                        Test Phone
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Close Button */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSecuritySettings(false)
+                  setError("")
+                  setSuccessMessage("")
+                  setTwofaPassword("")
+                  setTwofaMethodPassword("")
+                }}
+                className="w-full"
+              >
+                Close
+              </Button>
             </div>
           </div>
         </div>
