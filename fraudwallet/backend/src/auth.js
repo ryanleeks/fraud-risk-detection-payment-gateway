@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { validatePhoneNumber } = require('./validation');
+const { generateCode, storeCode, verifyCode, sendEmailCode, sendSMSCode } = require('./twofa');
 
 // How many times to encrypt the password (higher = more secure but slower)
 const SALT_ROUNDS = 10;
@@ -84,7 +85,9 @@ const signup = async (req, res) => {
         id: userId,
         fullName,
         email,
-        phoneNumber: phoneValidation.formatted
+        phoneNumber: phoneValidation.formatted,
+        twofaEnabled: false,
+        twofaMethod: 'email'
       }
     });
 
@@ -102,24 +105,38 @@ const signup = async (req, res) => {
 /**
  * LOGIN - Sign in with existing account
  * Steps:
- * 1. Find user by email
+ * 1. Find user by email or phone number
  * 2. Check if password matches
- * 3. Create authentication token
+ * 3. Check if 2FA is enabled
+ * 4. If 2FA enabled, send verification code
+ * 5. Otherwise, create authentication token
  */
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { emailOrPhone, password } = req.body;
 
     // Validate input
-    if (!email || !password) {
+    if (!emailOrPhone || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and password'
+        message: 'Please provide email/phone and password'
       });
     }
 
-    // Find user in database
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    // Determine if input is email or phone (check if it's all digits)
+    const isPhone = /^\d+$/.test(emailOrPhone.replace(/[\s\-\+]/g, ''));
+
+    // Find user in database by email or phone
+    let user;
+    if (isPhone) {
+      // Clean phone number (remove spaces, dashes, plus)
+      const cleanPhone = emailOrPhone.replace(/[\s\-\+]/g, '');
+      // Prepend 60 if not already present
+      const fullPhone = cleanPhone.startsWith('60') ? cleanPhone : `60${cleanPhone}`;
+      user = db.prepare('SELECT * FROM users WHERE phone_number = ?').get(fullPhone);
+    } else {
+      user = db.prepare('SELECT * FROM users WHERE email = ?').get(emailOrPhone);
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -142,7 +159,103 @@ const login = async (req, res) => {
     if (!passwordMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if 2FA is enabled
+    if (user.twofa_enabled) {
+      // Generate and send verification code
+      const code = generateCode();
+      storeCode(user.id, code, 'login');
+
+      // Send code based on user's preferred method
+      if (user.twofa_method === 'email') {
+        await sendEmailCode(user.email, user.full_name, code);
+      } else if (user.twofa_method === 'phone') {
+        const smsResult = await sendSMSCode(user.phone_number, code);
+        if (!smsResult.success) {
+          return res.status(400).json({
+            success: false,
+            message: smsResult.error
+          });
+        }
+      }
+
+      // Return response indicating 2FA is required
+      // We send a temporary ID (not a full JWT) for the verification step
+      return res.status(200).json({
+        success: true,
+        requiresTwoFA: true,
+        userId: user.id,
+        message: `Verification code sent to your ${user.twofa_method}`
+      });
+    }
+
+    // No 2FA - proceed with normal login
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET || 'default-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    // Return success with token and user info
+    res.status(200).json({
+      success: true,
+      message: 'Login successful!',
+      token,
+      user: {
+        id: user.id,
+        fullName: user.full_name,
+        email: user.email,
+        phoneNumber: user.phone_number,
+        twofaEnabled: user.twofa_enabled,
+        twofaMethod: user.twofa_method
+      }
+    });
+
+    console.log(`✅ User logged in: ${user.email}`);
+
+  } catch (error) {
+    console.error('❌ Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error logging in'
+    });
+  }
+};
+
+/**
+ * VERIFY 2FA - Verify 2FA code and complete login
+ */
+const verify2FA = async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and verification code are required'
+      });
+    }
+
+    // Verify the code
+    const verification = verifyCode(userId, code, 'login');
+
+    if (!verification.valid) {
+      return res.status(401).json({
+        success: false,
+        message: verification.message
+      });
+    }
+
+    // Get user details
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
@@ -162,22 +275,25 @@ const login = async (req, res) => {
         id: user.id,
         fullName: user.full_name,
         email: user.email,
-        phoneNumber: user.phone_number
+        phoneNumber: user.phone_number,
+        twofaEnabled: user.twofa_enabled,
+        twofaMethod: user.twofa_method
       }
     });
 
-    console.log(`✅ User logged in: ${email}`);
+    console.log(`✅ User verified 2FA and logged in: ${user.email}`);
 
   } catch (error) {
-    console.error('❌ Login error:', error);
+    console.error('❌ 2FA verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error logging in'
+      message: 'Error verifying code'
     });
   }
 };
 
 module.exports = {
   signup,
-  login
+  login,
+  verify2FA
 };
