@@ -53,7 +53,7 @@ const createSplitPayment = async (req, res) => {
 
     for (const participantId of participants) {
       // Validate participant exists
-      const participantUser = db.prepare('SELECT id FROM users WHERE id = ? AND account_status = "active"').get(participantId);
+      const participantUser = db.prepare("SELECT id FROM users WHERE id = ? AND account_status = 'active'").get(participantId);
 
       if (!participantUser) {
         // Rollback - delete the split payment
