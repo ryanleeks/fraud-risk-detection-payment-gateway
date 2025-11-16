@@ -16,7 +16,7 @@ const getProfile = (req, res) => {
 
     // Get user from database (exclude password)
     const user = db.prepare(`
-      SELECT id, full_name, email, phone_number, phone_last_changed, account_status, created_at, updated_at
+      SELECT id, account_id, full_name, email, phone_number, phone_last_changed, account_status, twofa_enabled, twofa_method, created_at, updated_at
       FROM users
       WHERE id = ?
     `).get(userId);
@@ -32,11 +32,14 @@ const getProfile = (req, res) => {
       success: true,
       user: {
         id: user.id,
+        accountId: user.account_id,
         fullName: user.full_name,
         email: user.email,
         phoneNumber: user.phone_number,
         phoneLastChanged: user.phone_last_changed,
         accountStatus: user.account_status,
+        twofaEnabled: user.twofa_enabled,
+        twofaMethod: user.twofa_method,
         createdAt: user.created_at,
         updatedAt: user.updated_at
       }

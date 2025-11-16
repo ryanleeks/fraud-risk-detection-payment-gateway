@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX } from "lucide-react"
+import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX, Copy, QrCode } from "lucide-react"
+import { QRCodeCanvas } from "qrcode.react"
 
 export function ProfileTab() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export function ProfileTab() {
   const [showAccountSettings, setShowAccountSettings] = useState(false)
   const [showSecuritySettings, setShowSecuritySettings] = useState(false)
   const [showTerminateModal, setShowTerminateModal] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
@@ -395,6 +397,30 @@ export function ProfileTab() {
           <p className="text-sm text-muted-foreground">{user.email}</p>
           {user.phoneNumber && (
             <p className="text-sm text-muted-foreground">+{user.phoneNumber}</p>
+          )}
+          {user.accountId && (
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <p className="text-sm font-mono font-semibold text-primary">
+                Account ID: {user.accountId}
+              </p>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(user.accountId)
+                  alert("Account ID copied to clipboard!")
+                }}
+                className="rounded p-1 hover:bg-muted transition-colors"
+                title="Copy Account ID"
+              >
+                <Copy className="h-4 w-4 text-muted-foreground hover:text-primary" />
+              </button>
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="rounded p-1 hover:bg-muted transition-colors"
+                title="Show QR Code"
+              >
+                <QrCode className="h-4 w-4 text-muted-foreground hover:text-primary" />
+              </button>
+            </div>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
@@ -917,6 +943,56 @@ export function ProfileTab() {
               >
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && user?.accountId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold text-center">Account ID QR Code</h3>
+
+            <div className="flex flex-col items-center gap-4">
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeCanvas
+                  value={user.accountId}
+                  size={256}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-1">Your Account ID</p>
+                <p className="text-lg font-mono font-bold text-primary">{user.accountId}</p>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Scan this QR code to share your Account ID for receiving payments
+              </p>
+
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.accountId)
+                    alert("Account ID copied to clipboard!")
+                  }}
+                  className="flex-1"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy ID
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowQRModal(false)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </div>
