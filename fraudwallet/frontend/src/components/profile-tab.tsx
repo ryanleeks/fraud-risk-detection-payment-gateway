@@ -428,22 +428,6 @@ export function ProfileTab() {
         </Button>
       </div>
 
-      {/* Account Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-primary">156</p>
-          <p className="text-xs text-muted-foreground">Transactions</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-accent">$24.5K</p>
-          <p className="text-xs text-muted-foreground">Total Sent</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-primary">12</p>
-          <p className="text-xs text-muted-foreground">Contacts</p>
-        </Card>
-      </div>
-
       {/* Menu Items */}
       <div className="space-y-2">
         {menuItems.map((item, index) => (

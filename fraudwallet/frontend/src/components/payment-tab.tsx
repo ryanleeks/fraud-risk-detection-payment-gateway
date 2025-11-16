@@ -1,23 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Send, User, DollarSign } from "lucide-react"
+import { Send, DollarSign, Copy, QrCode } from "lucide-react"
+import { QRCodeCanvas } from "qrcode.react"
 
 export function PaymentTab() {
   const [amount, setAmount] = useState("")
   const [recipient, setRecipient] = useState("")
   const [note, setNote] = useState("")
+  const [user, setUser] = useState<any>(null)
+  const [showQRModal, setShowQRModal] = useState(false)
 
-  const recentContacts = [
-    { id: 1, name: "Sarah J.", avatar: "SJ" },
-    { id: 2, name: "Michael C.", avatar: "MC" },
-    { id: 3, name: "Emma W.", avatar: "EW" },
-    { id: 4, name: "David L.", avatar: "DL" },
-  ]
+  // Load user data from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    }
+  }, [])
 
   const handleSend = () => {
     // Handle payment logic
@@ -37,6 +41,37 @@ export function PaymentTab() {
         </div>
       </div>
 
+      {/* My Account ID */}
+      {user?.accountId && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">Your Account ID</p>
+              <p className="text-lg font-mono font-bold text-primary">{user.accountId}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(user.accountId)
+                  alert("Account ID copied to clipboard!")
+                }}
+                className="rounded p-2 hover:bg-muted transition-colors"
+                title="Copy Account ID"
+              >
+                <Copy className="h-5 w-5 text-muted-foreground hover:text-primary" />
+              </button>
+              <button
+                onClick={() => setShowQRModal(true)}
+                className="rounded p-2 hover:bg-muted transition-colors"
+                title="Show QR Code"
+              >
+                <QrCode className="h-5 w-5 text-muted-foreground hover:text-primary" />
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Amount Input */}
       <Card className="p-6">
         <Label htmlFor="amount" className="text-sm text-muted-foreground">
@@ -55,39 +90,19 @@ export function PaymentTab() {
         </div>
       </Card>
 
-      {/* Recent Contacts */}
-      <div>
-        <h3 className="mb-3 text-sm font-medium text-muted-foreground">Recent Contacts</h3>
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {recentContacts.map((contact) => (
-            <button
-              key={contact.id}
-              onClick={() => setRecipient(contact.name)}
-              className="flex flex-col items-center gap-2 transition-transform hover:scale-105"
-            >
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                {contact.avatar}
-              </div>
-              <span className="text-xs">{contact.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Payment Form */}
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="recipient">Recipient</Label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="recipient"
-              placeholder="Enter name or email"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <Input
+            id="recipient"
+            placeholder="Enter phone number, email, or Account ID"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            You can send money using phone number (+60...), email, or 12-digit Account ID
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -101,21 +116,55 @@ export function PaymentTab() {
         </Button>
       </div>
 
-      {/* Payment Methods */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <span className="text-sm font-bold text-primary">••••</span>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Wallet Balance</p>
-              <p className="text-xs text-muted-foreground">$12,458.50 available</p>
+      {/* QR Code Modal */}
+      {showQRModal && user?.accountId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold text-center">Your Account ID QR Code</h3>
+
+            <div className="flex flex-col items-center gap-4">
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeCanvas
+                  value={user.accountId}
+                  size={256}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-1">Your Account ID</p>
+                <p className="text-lg font-mono font-bold text-primary">{user.accountId}</p>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Share this QR code to receive payments from others
+              </p>
+
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.accountId)
+                    alert("Account ID copied to clipboard!")
+                  }}
+                  className="flex-1"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy ID
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowQRModal(false)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
-          <button className="text-sm text-primary">Change</button>
         </div>
-      </Card>
+      )}
     </div>
   )
 }
