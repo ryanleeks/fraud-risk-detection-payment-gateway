@@ -516,6 +516,91 @@ const send2FATest = async (req, res) => {
   }
 };
 
+/**
+ * LOOKUP RECIPIENT
+ * Search for a user by phone number, email, or Account ID
+ */
+const lookupRecipient = (req, res) => {
+  try {
+    const { query } = req.body;
+
+    if (!query || query.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a search query'
+      });
+    }
+
+    const searchQuery = query.trim();
+    let recipient = null;
+
+    // Try to find by Account ID (12 digits)
+    if (/^\d{12}$/.test(searchQuery)) {
+      recipient = db.prepare(`
+        SELECT id, account_id, full_name, email, phone_number
+        FROM users
+        WHERE account_id = ? AND account_status = 'active'
+      `).get(searchQuery);
+    }
+
+    // If not found, try to find by email
+    if (!recipient && searchQuery.includes('@')) {
+      recipient = db.prepare(`
+        SELECT id, account_id, full_name, email, phone_number
+        FROM users
+        WHERE email = ? AND account_status = 'active'
+      `).get(searchQuery);
+    }
+
+    // If not found, try to find by phone number
+    if (!recipient) {
+      // Normalize phone number (remove spaces, dashes, plus)
+      const phoneDigits = searchQuery.replace(/[\s\-\+]/g, '');
+      const fullPhone = phoneDigits.startsWith('60') ? phoneDigits : `60${phoneDigits}`;
+
+      recipient = db.prepare(`
+        SELECT id, account_id, full_name, email, phone_number
+        FROM users
+        WHERE phone_number = ? AND account_status = 'active'
+      `).get(fullPhone);
+    }
+
+    if (!recipient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recipient not found. Please check the phone number, email, or Account ID.'
+      });
+    }
+
+    // Don't allow users to send to themselves
+    if (recipient.id === req.user.userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot send money to yourself'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      recipient: {
+        accountId: recipient.account_id,
+        fullName: recipient.full_name,
+        email: recipient.email,
+        phoneNumber: recipient.phone_number
+      }
+    });
+
+    console.log(`✅ User ${req.user.userId} looked up recipient: ${recipient.full_name}`);
+
+  } catch (error) {
+    console.error('❌ Lookup recipient error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error looking up recipient'
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -523,5 +608,6 @@ module.exports = {
   changePhoneNumber,
   toggle2FA,
   update2FAMethod,
-  send2FATest
+  send2FATest,
+  lookupRecipient
 };

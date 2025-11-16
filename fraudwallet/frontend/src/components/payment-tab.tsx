@@ -14,6 +14,9 @@ export function PaymentTab() {
   const [note, setNote] = useState("")
   const [user, setUser] = useState<any>(null)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [recipientData, setRecipientData] = useState<any>(null)
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [lookupError, setLookupError] = useState("")
 
   // Load user data from localStorage
   useEffect(() => {
@@ -23,9 +26,50 @@ export function PaymentTab() {
     }
   }, [])
 
+  // Lookup recipient by phone/email/Account ID
+  const handleLookupRecipient = async () => {
+    if (!recipient.trim()) {
+      setLookupError("Please enter a phone number, email, or Account ID")
+      return
+    }
+
+    setLookupLoading(true)
+    setLookupError("")
+    setRecipientData(null)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/payment/lookup-recipient", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: recipient })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setRecipientData(data.recipient)
+        setLookupError("")
+      } else {
+        setLookupError(data.message || "Recipient not found")
+        setRecipientData(null)
+      }
+    } catch (err) {
+      console.error("Lookup recipient error:", err)
+      setLookupError("Unable to connect to server")
+      setRecipientData(null)
+    } finally {
+      setLookupLoading(false)
+    }
+  }
+
   const handleSend = () => {
     // Handle payment logic
-    console.log("[v0] Sending payment:", { amount, recipient, note })
+    console.log("[v0] Sending payment:", { amount, recipient, note, recipientData })
   }
 
   return (
@@ -94,15 +138,63 @@ export function PaymentTab() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="recipient">Recipient</Label>
-          <Input
-            id="recipient"
-            placeholder="Enter phone number, email, or Account ID"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="recipient"
+              placeholder="Enter phone number, email, or Account ID"
+              value={recipient}
+              onChange={(e) => {
+                setRecipient(e.target.value)
+                setRecipientData(null)
+                setLookupError("")
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleLookupRecipient()
+                }
+              }}
+            />
+            <Button
+              onClick={handleLookupRecipient}
+              disabled={lookupLoading || !recipient.trim()}
+              variant="outline"
+            >
+              {lookupLoading ? "Looking..." : "Lookup"}
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
             You can send money using phone number (+60...), email, or 12-digit Account ID
           </p>
+
+          {/* Error message */}
+          {lookupError && (
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {lookupError}
+            </div>
+          )}
+
+          {/* Recipient details */}
+          {recipientData && (
+            <Card className="p-4 bg-primary/5 border-primary/20">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Sending to:</p>
+                    <p className="text-lg font-bold">{recipientData.fullName}</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
+                    {recipientData.fullName?.charAt(0).toUpperCase()}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>Account ID: <span className="font-mono font-semibold text-primary">{recipientData.accountId}</span></p>
+                  {recipientData.email && <p>Email: {recipientData.email}</p>}
+                  {recipientData.phoneNumber && <p>Phone: +{recipientData.phoneNumber}</p>}
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-2">

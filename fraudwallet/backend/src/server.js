@@ -48,6 +48,9 @@ app.post('/api/user/2fa/toggle', verifyToken, user.toggle2FA);
 app.put('/api/user/2fa/method', verifyToken, user.update2FAMethod);
 app.post('/api/user/2fa/test', verifyToken, user.send2FATest);
 
+// Payment routes (protected)
+app.post('/api/payment/lookup-recipient', verifyToken, user.lookupRecipient);
+
 // Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
