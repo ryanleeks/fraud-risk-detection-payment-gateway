@@ -583,6 +583,7 @@ const lookupRecipient = (req, res) => {
     res.status(200).json({
       success: true,
       recipient: {
+        id: recipient.id,
         accountId: recipient.account_id,
         fullName: recipient.full_name,
         email: recipient.email,
