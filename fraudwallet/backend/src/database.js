@@ -129,11 +129,55 @@ const createVerificationCodesTable = () => {
   console.log('✅ Verification codes table is ready');
 };
 
+// Create split payments table
+const createSplitPaymentsTable = () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS split_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creator_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      total_amount REAL NOT NULL,
+      num_participants INTEGER NOT NULL,
+      amount_per_person REAL NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (creator_id) REFERENCES users(id)
+    )
+  `;
+
+  db.exec(sql);
+  console.log('✅ Split payments table is ready');
+};
+
+// Create split participants table
+const createSplitParticipantsTable = () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS split_participants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      split_payment_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending',
+      paid INTEGER DEFAULT 0,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      responded_at DATETIME,
+      FOREIGN KEY (split_payment_id) REFERENCES split_payments(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `;
+
+  db.exec(sql);
+  console.log('✅ Split participants table is ready');
+};
+
 // Initialize database
 const initDatabase = () => {
   try {
     createUsersTable();
     createVerificationCodesTable();
+    createSplitPaymentsTable();
+    createSplitParticipantsTable();
     console.log('🎉 Database initialized successfully!');
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);

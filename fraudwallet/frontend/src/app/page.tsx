@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { DashboardTab } from "@/components/dashboard-tab"
 import { PaymentTab } from "@/components/payment-tab"
+import { SplitPayTab } from "@/components/splitpay-tab"
 import { ProfileTab } from "@/components/profile-tab"
-import { Home, Send, User } from "lucide-react"
+import { Home, Send, Users, User } from "lucide-react"
 
 export default function WalletApp() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "profile">("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "splitpay" | "profile">("dashboard")
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
@@ -28,6 +29,7 @@ export default function WalletApp() {
           <div className="h-[600px] overflow-y-auto bg-background">
             {activeTab === "dashboard" && <DashboardTab />}
             {activeTab === "payment" && <PaymentTab />}
+            {activeTab === "splitpay" && <SplitPayTab />}
             {activeTab === "profile" && <ProfileTab />}
           </div>
 
@@ -51,6 +53,15 @@ export default function WalletApp() {
               >
                 <Send className="h-6 w-6" />
                 <span className="text-xs font-medium">Payment</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("splitpay")}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeTab === "splitpay" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Users className="h-6 w-6" />
+                <span className="text-xs font-medium">SplitPay</span>
               </button>
               <button
                 onClick={() => setActiveTab("profile")}

@@ -51,6 +51,13 @@ app.post('/api/user/2fa/test', verifyToken, user.send2FATest);
 // Payment routes (protected)
 app.post('/api/payment/lookup-recipient', verifyToken, user.lookupRecipient);
 
+// Split payment routes (protected)
+const splitpay = require('./splitpay');
+app.post('/api/splitpay/create', verifyToken, splitpay.createSplitPayment);
+app.get('/api/splitpay/my-splits', verifyToken, splitpay.getMySplitPayments);
+app.post('/api/splitpay/respond', verifyToken, splitpay.respondToSplitPayment);
+app.post('/api/splitpay/pay', verifyToken, splitpay.payMyShare);
+
 // Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
