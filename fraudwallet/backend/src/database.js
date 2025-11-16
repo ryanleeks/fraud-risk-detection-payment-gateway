@@ -16,6 +16,7 @@ const createUsersTable = () => {
   const sql = `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id TEXT UNIQUE NOT NULL,
       full_name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -63,9 +64,50 @@ const createUsersTable = () => {
       db.exec("ALTER TABLE users ADD COLUMN twofa_method TEXT DEFAULT 'email'");
       console.log('✅ Added twofa_method column');
     }
+
+    if (!columnNames.includes('account_id')) {
+      db.exec("ALTER TABLE users ADD COLUMN account_id TEXT");
+      console.log('✅ Added account_id column');
+
+      // Generate Account IDs for existing users
+      const usersWithoutAccountId = db.prepare('SELECT id FROM users WHERE account_id IS NULL').all();
+      if (usersWithoutAccountId.length > 0) {
+        const updateStmt = db.prepare('UPDATE users SET account_id = ? WHERE id = ?');
+        for (const user of usersWithoutAccountId) {
+          const accountId = generateUniqueAccountId();
+          updateStmt.run(accountId, user.id);
+        }
+        console.log(`✅ Generated Account IDs for ${usersWithoutAccountId.length} existing users`);
+      }
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }
+};
+
+/**
+ * Generate a unique 12-digit Account ID
+ * Format: 12 random digits (0-9)
+ */
+const generateUniqueAccountId = () => {
+  let accountId;
+  let isUnique = false;
+
+  while (!isUnique) {
+    // Generate 12 random digits
+    accountId = '';
+    for (let i = 0; i < 12; i++) {
+      accountId += Math.floor(Math.random() * 10);
+    }
+
+    // Check if this Account ID already exists
+    const existing = db.prepare('SELECT id FROM users WHERE account_id = ?').get(accountId);
+    if (!existing) {
+      isUnique = true;
+    }
+  }
+
+  return accountId;
 };
 
 // Create verification codes table
@@ -102,5 +144,6 @@ const initDatabase = () => {
 // Run initialization
 initDatabase();
 
-// Export database instance
+// Export database instance and utility functions
 module.exports = db;
+module.exports.generateUniqueAccountId = generateUniqueAccountId;

@@ -2,6 +2,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const { generateUniqueAccountId } = require('./database');
 const { validatePhoneNumber } = require('./validation');
 const { generateCode, storeCode, verifyCode, sendEmailCode, sendSMSCode } = require('./twofa');
 
@@ -60,13 +61,16 @@ const signup = async (req, res) => {
     // Hash the password (encrypt it so we don't store plain text)
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // Generate unique Account ID
+    const accountId = generateUniqueAccountId();
+
     // Insert new user into database
     const insertUser = db.prepare(`
-      INSERT INTO users (full_name, email, password_hash, phone_number, phone_last_changed)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO users (account_id, full_name, email, password_hash, phone_number, phone_last_changed)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
 
-    const result = insertUser.run(fullName, email, passwordHash, phoneValidation.formatted);
+    const result = insertUser.run(accountId, fullName, email, passwordHash, phoneValidation.formatted);
     const userId = result.lastInsertRowid;
 
     // Create JWT token (like a digital passport)
@@ -83,6 +87,7 @@ const signup = async (req, res) => {
       token,
       user: {
         id: userId,
+        accountId,
         fullName,
         email,
         phoneNumber: phoneValidation.formatted,
@@ -206,6 +211,7 @@ const login = async (req, res) => {
       token,
       user: {
         id: user.id,
+        accountId: user.account_id,
         fullName: user.full_name,
         email: user.email,
         phoneNumber: user.phone_number,
@@ -273,6 +279,7 @@ const verify2FA = async (req, res) => {
       token,
       user: {
         id: user.id,
+        accountId: user.account_id,
         fullName: user.full_name,
         email: user.email,
         phoneNumber: user.phone_number,
