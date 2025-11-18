@@ -11,7 +11,7 @@ console.log('👥 USERS TABLE');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
 // Get all users
-const users = db.prepare('SELECT id, full_name, email, created_at FROM users').all();
+const users = db.prepare('SELECT id, full_name, email, created_at, updated_at, account_status, phone_number, phone_last_changed FROM users').all();
 
 if (users.length === 0) {
   console.log('❌ No users found in database\n');
@@ -24,6 +24,11 @@ if (users.length === 0) {
     console.log(`  Name: ${user.full_name}`);
     console.log(`  Email: ${user.email}`);
     console.log(`  Created: ${user.created_at}`);
+    console.log(`  Updated: ${user.updated_at}`);
+    console.log(`  Account Status: ${user.account_status}`);
+    console.log(`  Phone Number: ${user.phone_number}`);
+    console.log(`  Phone Last Changed: ${user.phone_last_changed}`);
+    console.log(`     *** Database and server time are in UTC+0 ***`);
     console.log('');
   });
 }
