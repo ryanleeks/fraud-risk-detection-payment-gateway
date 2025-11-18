@@ -11,6 +11,12 @@ const app = express();
 
 // Middleware - These help our server understand requests
 app.use(cors()); // Allow frontend to talk to backend
+
+// Stripe webhook needs raw body BEFORE express.json()
+const wallet = require('./wallet');
+app.post('/api/webhook/stripe', express.raw({type: 'application/json'}), wallet.handleStripeWebhook);
+
+// Now parse JSON for other routes
 app.use(express.json()); // Understand JSON data
 
 // Simple test route to check if server is working
@@ -57,6 +63,11 @@ app.post('/api/splitpay/create', verifyToken, splitpay.createSplitPayment);
 app.get('/api/splitpay/my-splits', verifyToken, splitpay.getMySplitPayments);
 app.post('/api/splitpay/respond', verifyToken, splitpay.respondToSplitPayment);
 app.post('/api/splitpay/pay', verifyToken, splitpay.payMyShare);
+
+// Wallet routes (protected)
+app.get('/api/wallet/balance', verifyToken, wallet.getWalletBalance);
+app.post('/api/wallet/add-funds', verifyToken, wallet.createPaymentIntent);
+app.get('/api/wallet/transactions', verifyToken, wallet.getTransactionHistory);
 
 // Start the server
 const PORT = process.env.PORT || 8080;

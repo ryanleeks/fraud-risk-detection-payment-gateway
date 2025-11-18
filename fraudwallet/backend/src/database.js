@@ -80,6 +80,11 @@ const createUsersTable = () => {
         console.log(`✅ Generated Account IDs for ${usersWithoutAccountId.length} existing users`);
       }
     }
+
+    if (!columnNames.includes('wallet_balance')) {
+      db.exec("ALTER TABLE users ADD COLUMN wallet_balance REAL DEFAULT 0.00");
+      console.log('✅ Added wallet_balance column');
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }
@@ -171,6 +176,29 @@ const createSplitParticipantsTable = () => {
   console.log('✅ Split participants table is ready');
 };
 
+// Create transactions table
+const createTransactionsTable = () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT DEFAULT 'pending',
+      description TEXT,
+      stripe_payment_intent_id TEXT,
+      recipient_id INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (recipient_id) REFERENCES users(id)
+    )
+  `;
+
+  db.exec(sql);
+  console.log('✅ Transactions table is ready');
+};
+
 // Initialize database
 const initDatabase = () => {
   try {
@@ -178,6 +206,7 @@ const initDatabase = () => {
     createVerificationCodesTable();
     createSplitPaymentsTable();
     createSplitParticipantsTable();
+    createTransactionsTable();
     console.log('🎉 Database initialized successfully!');
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);
