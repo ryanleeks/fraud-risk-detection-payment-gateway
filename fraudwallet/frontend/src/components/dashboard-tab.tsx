@@ -7,9 +7,100 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard } from "lucide-react"
 import { loadStripe } from "@stripe/stripe-js"
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
+
+// Payment Form Component with Stripe Elements
+function StripePaymentForm({
+  clientSecret,
+  amount,
+  onSuccess,
+  onCancel
+}: {
+  clientSecret: string
+  amount: string
+  onSuccess: () => void
+  onCancel: () => void
+}) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [processing, setProcessing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!stripe || !elements) {
+      return
+    }
+
+    setProcessing(true)
+    setErrorMessage("")
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin + "/payment-success",
+        },
+        redirect: "if_required"
+      })
+
+      if (error) {
+        setErrorMessage(error.message || "Payment failed")
+        setProcessing(false)
+      } else if (paymentIntent && paymentIntent.status === "succeeded") {
+        // Payment successful!
+        onSuccess()
+      } else if (paymentIntent && paymentIntent.status === "processing") {
+        // Payment is processing
+        setErrorMessage("Payment is processing. Please wait...")
+        // Poll for status or wait for webhook
+        setTimeout(onSuccess, 2000)
+      }
+    } catch (err) {
+      console.error("Payment error:", err)
+      setErrorMessage("An unexpected error occurred")
+      setProcessing(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-lg border p-4">
+        <PaymentElement />
+      </div>
+
+      {errorMessage && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button
+          type="submit"
+          disabled={!stripe || processing}
+          className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+          size="lg"
+        >
+          {processing ? "Processing..." : `Pay RM ${amount}`}
+        </Button>
+        <Button
+          type="button"
+          onClick={onCancel}
+          variant="outline"
+          disabled={processing}
+          size="lg"
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  )
+}
 
 export function DashboardTab() {
   const [user, setUser] = useState<any>(null)
@@ -20,6 +111,8 @@ export function DashboardTab() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [refreshing, setRefreshing] = useState(false)
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
 
   // Load user data and wallet info
   useEffect(() => {
@@ -75,7 +168,7 @@ export function DashboardTab() {
     }
   }
 
-  // Handle add funds
+  // Handle add funds - Create payment intent
   const handleAddFunds = async () => {
     const amountNum = parseFloat(amount)
 
@@ -108,17 +201,9 @@ export function DashboardTab() {
       const data = await response.json()
 
       if (data.success) {
-        // Redirect to Stripe checkout (simplified version)
-        // In production, you'd use Stripe Elements for embedded checkout
-        alert(`Payment intent created! In test mode, this would redirect to Stripe checkout.\n\nClient Secret: ${data.clientSecret.substring(0, 20)}...`)
-
-        // For demo: simulate successful payment after 2 seconds
-        setTimeout(() => {
-          loadWalletData()
-          setShowAddFundsModal(false)
-          setAmount("")
-          alert("Payment successful! Your wallet has been credited.")
-        }, 2000)
+        // Store client secret to show Stripe payment form
+        setClientSecret(data.clientSecret)
+        setPaymentIntentId(data.paymentIntentId)
       } else {
         setError(data.message || "Failed to create payment intent")
       }
@@ -128,6 +213,27 @@ export function DashboardTab() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle successful payment
+  const handlePaymentSuccess = () => {
+    // Reload wallet data to show updated balance
+    loadWalletData()
+    // Close modal and reset
+    setShowAddFundsModal(false)
+    setAmount("")
+    setClientSecret(null)
+    setPaymentIntentId(null)
+    // Show success message
+    alert("Payment successful! Your wallet has been credited.")
+  }
+
+  // Handle payment cancellation
+  const handlePaymentCancel = () => {
+    setClientSecret(null)
+    setPaymentIntentId(null)
+    setAmount("")
+    setError("")
   }
 
   // Quick amount buttons
@@ -274,12 +380,16 @@ export function DashboardTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">Add Funds to Wallet</h3>
+              <h3 className="text-xl font-bold">
+                {clientSecret ? "Complete Payment" : "Add Funds to Wallet"}
+              </h3>
               <button
                 onClick={() => {
                   setShowAddFundsModal(false)
                   setAmount("")
                   setError("")
+                  setClientSecret(null)
+                  setPaymentIntentId(null)
                 }}
                 className="text-muted-foreground hover:text-foreground"
               >
@@ -293,57 +403,77 @@ export function DashboardTab() {
               </div>
             )}
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="amount">Amount (RM)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="Enter amount"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  min="10"
-                  step="10"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Minimum: RM 10</p>
-              </div>
-
-              {/* Quick Amount Buttons */}
-              <div>
-                <Label>Quick Select</Label>
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  {quickAmounts.map((quickAmount) => (
-                    <Button
-                      key={quickAmount}
-                      onClick={() => setAmount(quickAmount.toString())}
-                      variant="outline"
-                      size="sm"
-                    >
-                      RM {quickAmount}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-muted p-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <CreditCard className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Stripe Payment (Test Mode)</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Secure payment processing by Stripe
-                </p>
-              </div>
-
-              <Button
-                onClick={handleAddFunds}
-                disabled={loading || !amount}
-                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                size="lg"
+            {/* Show payment form if we have client secret, otherwise show amount selection */}
+            {clientSecret ? (
+              <Elements
+                stripe={stripePromise}
+                options={{
+                  clientSecret,
+                  appearance: {
+                    theme: 'stripe',
+                  },
+                }}
               >
-                {loading ? "Processing..." : `Add RM ${amount || "0"}`}
-              </Button>
-            </div>
+                <StripePaymentForm
+                  clientSecret={clientSecret}
+                  amount={amount}
+                  onSuccess={handlePaymentSuccess}
+                  onCancel={handlePaymentCancel}
+                />
+              </Elements>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="amount">Amount (RM)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    min="10"
+                    step="10"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Minimum: RM 10</p>
+                </div>
+
+                {/* Quick Amount Buttons */}
+                <div>
+                  <Label>Quick Select</Label>
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    {quickAmounts.map((quickAmount) => (
+                      <Button
+                        key={quickAmount}
+                        onClick={() => setAmount(quickAmount.toString())}
+                        variant="outline"
+                        size="sm"
+                      >
+                        RM {quickAmount}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-muted p-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Stripe Payment (Test Mode)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Secure payment processing by Stripe
+                  </p>
+                </div>
+
+                <Button
+                  onClick={handleAddFunds}
+                  disabled={loading || !amount}
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                  size="lg"
+                >
+                  {loading ? "Creating payment..." : `Continue to Payment`}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
