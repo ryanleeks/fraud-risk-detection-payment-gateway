@@ -1,11 +1,29 @@
 "use client"
 
 import { useState, useEffect } from "react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Card } from "@/components/ui/card"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Button } from "@/components/ui/button"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Input } from "@/components/ui/input"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Label } from "@/components/ui/label"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle } from "lucide-react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export function SplitPayTab() {
   const [user, setUser] = useState<any>(null)
@@ -36,7 +54,7 @@ export function SplitPayTab() {
     setRefreshing(true)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/splitpay/my-splits", {
+      const response = await fetch(`${API_URL}/api/splitpay/my-splits", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -66,7 +84,7 @@ export function SplitPayTab() {
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/payment/lookup-recipient", {
+      const response = await fetch(`${API_URL}/api/payment/lookup-recipient", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -123,7 +141,7 @@ export function SplitPayTab() {
 
       // We need to find user IDs from the backend first
       // For now, let's assume we store the full user data in participants
-      const response = await fetch("http://localhost:8080/api/splitpay/create", {
+      const response = await fetch(`${API_URL}/api/splitpay/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -164,7 +182,7 @@ export function SplitPayTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/splitpay/respond", {
+      const response = await fetch(`${API_URL}/api/splitpay/respond", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -195,7 +213,7 @@ export function SplitPayTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/splitpay/pay", {
+      const response = await fetch(`${API_URL}/api/splitpay/pay", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

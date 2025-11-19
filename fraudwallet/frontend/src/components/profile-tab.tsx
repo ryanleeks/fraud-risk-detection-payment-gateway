@@ -1,12 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { useRouter } from "next/navigation"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Card } from "@/components/ui/card"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Button } from "@/components/ui/button"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Input } from "@/components/ui/input"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX, Copy, QrCode } from "lucide-react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { QRCodeCanvas } from "qrcode.react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export function ProfileTab() {
   const router = useRouter()
@@ -75,7 +96,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/profile", {
+      const response = await fetch(`${API_URL}/api/user/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -122,7 +143,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/profile", {
+      const response = await fetch(`${API_URL}/api/user/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -174,7 +195,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/phone", {
+      const response = await fetch(`${API_URL}/api/user/phone", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -224,7 +245,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/terminate", {
+      const response = await fetch(`${API_URL}/api/user/terminate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -265,7 +286,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/toggle", {
+      const response = await fetch(`${API_URL}/api/user/2fa/toggle", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -308,7 +329,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/method", {
+      const response = await fetch(`${API_URL}/api/user/2fa/method", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -346,7 +367,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/test", {
+      const response = await fetch(`${API_URL}/api/user/2fa/test", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

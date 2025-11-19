@@ -1,12 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Card } from "@/components/ui/card"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Button } from "@/components/ui/button"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Input } from "@/components/ui/input"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Label } from "@/components/ui/label"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Send, DollarSign, Copy, QrCode } from "lucide-react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { QRCodeCanvas } from "qrcode.react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export function PaymentTab() {
   const [amount, setAmount] = useState("")
@@ -40,7 +61,7 @@ export function PaymentTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/payment/lookup-recipient", {
+      const response = await fetch(`${API_URL}/api/payment/lookup-recipient", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

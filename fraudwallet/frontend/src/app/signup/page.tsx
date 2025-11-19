@@ -2,12 +2,33 @@
 
 import type React from "react"
 
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+
 import { useState } from "react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { useRouter } from "next/navigation"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Button } from "@/components/ui/button"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Input } from "@/components/ui/input"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import { Wallet, Mail, Lock, User, Eye, EyeOff, Phone } from "lucide-react"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 import Link from "next/link"
+
+// API URL configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -52,7 +73,7 @@ export default function SignupPage() {
 
     try {
       // Call backend API
-      const response = await fetch("http://localhost:8080/api/auth/signup", {
+      const response = await fetch(`${API_URL}/api/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
