@@ -96,30 +96,41 @@ const handleStripeWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  console.log('📥 Webhook received at:', new Date().toISOString());
+  console.log('Webhook secret configured:', webhookSecret ? 'Yes (' + webhookSecret.substring(0, 10) + '...)' : 'No ❌');
+
   let event;
 
   try {
     // Verify webhook signature
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    console.log('✅ Webhook signature verified');
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  console.log('📨 Event type:', event.type);
+  console.log('Event ID:', event.id);
+
   // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded':
       const paymentIntent = event.data.object;
+      console.log('💳 Payment Intent ID:', paymentIntent.id);
+      console.log('💰 Amount:', paymentIntent.amount / 100, paymentIntent.currency.toUpperCase());
+      console.log('👤 User ID from metadata:', paymentIntent.metadata.user_id);
       await handlePaymentSuccess(paymentIntent);
       break;
 
     case 'payment_intent.payment_failed':
       const failedPayment = event.data.object;
+      console.log('❌ Payment failed:', failedPayment.id);
       await handlePaymentFailure(failedPayment);
       break;
 
     default:
-      console.log(`Unhandled event type ${event.type}`);
+      console.log(`ℹ️  Unhandled event type: ${event.type}`);
   }
 
   res.status(200).json({ received: true });
