@@ -17,6 +17,9 @@ export function PaymentTab() {
   const [recipientData, setRecipientData] = useState<any>(null)
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState("")
+  const [sendLoading, setSendLoading] = useState(false)
+  const [sendError, setSendError] = useState("")
+  const [sendSuccess, setSendSuccess] = useState(false)
 
   // Load user data from localStorage
   useEffect(() => {
@@ -67,9 +70,66 @@ export function PaymentTab() {
     }
   }
 
-  const handleSend = () => {
-    // Handle payment logic
-    console.log("[v0] Sending payment:", { amount, recipient, note, recipientData })
+  const handleSend = async () => {
+    // Reset states
+    setSendError("")
+    setSendSuccess(false)
+
+    // Validate amount
+    if (!amount || parseFloat(amount) <= 0) {
+      setSendError("Please enter a valid amount")
+      return
+    }
+
+    // Validate recipient
+    if (!recipientData) {
+      setSendError("Please lookup and confirm the recipient first")
+      return
+    }
+
+    setSendLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/wallet/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          recipientId: recipientData.id,
+          amount: parseFloat(amount),
+          note: note || undefined
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSendSuccess(true)
+        setSendError("")
+        // Reset form
+        setAmount("")
+        setRecipient("")
+        setNote("")
+        setRecipientData(null)
+        // Show success message
+        alert(`Successfully sent RM${amount} to ${recipientData.fullName}!`)
+        // Optionally refresh the page to update balance
+        window.location.reload()
+      } else {
+        setSendError(data.message || "Transfer failed")
+        setSendSuccess(false)
+      }
+    } catch (err) {
+      console.error("Send money error:", err)
+      setSendError("Unable to connect to server")
+      setSendSuccess(false)
+    } finally {
+      setSendLoading(false)
+    }
   }
 
   return (
@@ -202,9 +262,21 @@ export function PaymentTab() {
           <Input id="note" placeholder="What's this for?" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
 
-        <Button onClick={handleSend} className="w-full bg-accent text-accent-foreground hover:bg-accent/90" size="lg">
+        {/* Send Error message */}
+        {sendError && (
+          <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+            {sendError}
+          </div>
+        )}
+
+        <Button
+          onClick={handleSend}
+          className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+          size="lg"
+          disabled={sendLoading || !recipientData || !amount}
+        >
           <Send className="mr-2 h-5 w-5" />
-          Send ${amount || "0.00"}
+          {sendLoading ? "Sending..." : `Send RM${amount || "0.00"}`}
         </Button>
       </div>
 
