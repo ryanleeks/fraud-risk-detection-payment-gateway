@@ -68,6 +68,7 @@ app.post('/api/splitpay/pay', verifyToken, splitpay.payMyShare);
 app.get('/api/wallet/balance', verifyToken, wallet.getWalletBalance);
 app.post('/api/wallet/add-funds', verifyToken, wallet.createPaymentIntent);
 app.get('/api/wallet/transactions', verifyToken, wallet.getTransactionHistory);
+app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 
 // Start the server
 const PORT = process.env.PORT || 8080;

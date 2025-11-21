@@ -225,9 +225,125 @@ const getTransactionHistory = (req, res) => {
   }
 };
 
+/**
+ * SEND MONEY TO ANOTHER USER
+ * Transfer funds from one user to another
+ */
+const sendMoney = (req, res) => {
+  try {
+    const senderId = req.user.userId;
+    const { recipientId, amount, note } = req.body;
+
+    // Validate input
+    if (!recipientId || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient and amount are required'
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount must be greater than zero'
+      });
+    }
+
+    if (senderId === recipientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot send money to yourself'
+      });
+    }
+
+    // Check sender exists and has sufficient balance
+    const sender = db.prepare('SELECT id, wallet_balance, full_name FROM users WHERE id = ?').get(senderId);
+    if (!sender) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sender not found'
+      });
+    }
+
+    if (sender.wallet_balance < amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance'
+      });
+    }
+
+    // Check recipient exists
+    const recipient = db.prepare('SELECT id, full_name, account_id FROM users WHERE id = ?').get(recipientId);
+    if (!recipient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recipient not found'
+      });
+    }
+
+    // Perform transfer in a transaction for atomicity
+    const transfer = db.transaction(() => {
+      // Deduct from sender
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance - ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(amount, senderId);
+
+      // Add to recipient
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(amount, recipientId);
+
+      // Create transaction record for sender
+      const description = note || `Transfer to ${recipient.full_name}`;
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+        VALUES (?, 'transfer_sent', ?, 'completed', ?, ?)
+      `).run(senderId, amount, description, recipientId);
+
+      // Create transaction record for recipient
+      const recipientDescription = note || `Transfer from ${sender.full_name}`;
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+        VALUES (?, 'transfer_received', ?, 'completed', ?, ?)
+      `).run(recipientId, amount, recipientDescription, senderId);
+    });
+
+    // Execute the transaction
+    transfer();
+
+    console.log(`✅ Transfer successful: User ${senderId} sent RM${amount} to User ${recipientId}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Transfer successful',
+      transfer: {
+        amount,
+        recipient: {
+          name: recipient.full_name,
+          accountId: recipient.account_id
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Send money error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing transfer'
+    });
+  }
+};
+
 module.exports = {
   getWalletBalance,
   createPaymentIntent,
   handleStripeWebhook,
-  getTransactionHistory
+  getTransactionHistory,
+  sendMoney
 };
