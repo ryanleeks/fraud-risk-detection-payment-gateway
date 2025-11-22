@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard } from "lucide-react"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
+import { validateAmount, formatAmount, AMOUNT_LIMITS } from "@/utils/amountValidation"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
@@ -170,17 +171,16 @@ export function DashboardTab() {
 
   // Handle add funds - Create payment intent
   const handleAddFunds = async () => {
-    const amountNum = parseFloat(amount)
+    // Validate amount
+    const validation = validateAmount(amount, { minTopup: true })
 
-    if (!amount || isNaN(amountNum) || amountNum <= 0) {
-      setError("Please enter a valid amount")
+    if (!validation.isValid) {
+      setError(validation.error || "Invalid amount")
       return
     }
 
-    if (amountNum < 10) {
-      setError("Minimum amount is RM 10")
-      return
-    }
+    // Use the validated and rounded amount
+    const validatedAmount = validation.value
 
     setLoading(true)
     setError("")
@@ -195,7 +195,7 @@ export function DashboardTab() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: amountNum })
+        body: JSON.stringify({ amount: validatedAmount })
       })
 
       const data = await response.json()
@@ -432,9 +432,12 @@ export function DashboardTab() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     min="10"
-                    step="10"
+                    max="999999.99"
+                    step="0.01"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Minimum: RM 10</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Min: RM 10.00 | Max: RM 999,999.99
+                  </p>
                 </div>
 
                 {/* Quick Amount Buttons */}
