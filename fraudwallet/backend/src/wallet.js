@@ -2,6 +2,39 @@
 const db = require('./database');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+// Amount validation constants
+const AMOUNT_LIMITS = {
+  MIN: 0.01,
+  MAX: 999999.99,
+  MIN_TOPUP: 10.00
+};
+
+/**
+ * Validate and round amount to 2 decimal places
+ */
+const validateAmount = (amount, options = {}) => {
+  // Convert to number and round to 2 decimal places
+  const numAmount = Math.round(parseFloat(amount) * 100) / 100;
+
+  if (isNaN(numAmount)) {
+    return { isValid: false, error: 'Invalid amount format' };
+  }
+
+  if (numAmount <= 0) {
+    return { isValid: false, error: 'Amount must be greater than zero' };
+  }
+
+  if (options.minTopup && numAmount < AMOUNT_LIMITS.MIN_TOPUP) {
+    return { isValid: false, error: `Minimum top-up amount is RM ${AMOUNT_LIMITS.MIN_TOPUP.toFixed(2)}` };
+  }
+
+  if (numAmount > AMOUNT_LIMITS.MAX) {
+    return { isValid: false, error: `Maximum amount is RM ${AMOUNT_LIMITS.MAX.toFixed(2)}` };
+  }
+
+  return { isValid: true, value: numAmount };
+};
+
 /**
  * GET WALLET BALANCE
  * Get user's current wallet balance
@@ -42,15 +75,20 @@ const createPaymentIntent = async (req, res) => {
     const userId = req.user.userId;
     const { amount } = req.body;
 
-    if (!amount || amount <= 0) {
+    // Validate amount
+    const validation = validateAmount(amount, { minTopup: true });
+    if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a valid amount'
+        message: validation.error
       });
     }
 
+    // Use validated amount (already rounded to 2 decimals)
+    const validatedAmount = validation.value;
+
     // Stripe requires amount in cents
-    const amountInCents = Math.round(amount * 100);
+    const amountInCents = Math.round(validatedAmount * 100);
 
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -69,7 +107,7 @@ const createPaymentIntent = async (req, res) => {
     db.prepare(`
       INSERT INTO transactions (user_id, type, amount, status, description, stripe_payment_intent_id)
       VALUES (?, 'deposit', ?, 'pending', 'Add funds to wallet', ?)
-    `).run(userId, amount, paymentIntent.id);
+    `).run(userId, validatedAmount, paymentIntent.id);
 
     res.status(200).json({
       success: true,
@@ -77,7 +115,7 @@ const createPaymentIntent = async (req, res) => {
       paymentIntentId: paymentIntent.id
     });
 
-    console.log(`✅ Created payment intent for user ${userId}: RM${amount}`);
+    console.log(`✅ Created payment intent for user ${userId}: RM${validatedAmount.toFixed(2)}`);
 
   } catch (error) {
     console.error('❌ Create payment intent error:', error);
@@ -234,20 +272,25 @@ const sendMoney = (req, res) => {
     const senderId = req.user.userId;
     const { recipientId, amount, note } = req.body;
 
-    // Validate input
-    if (!recipientId || !amount) {
+    // Validate recipient
+    if (!recipientId) {
       return res.status(400).json({
         success: false,
-        message: 'Recipient and amount are required'
+        message: 'Recipient is required'
       });
     }
 
-    if (amount <= 0) {
+    // Validate amount
+    const validation = validateAmount(amount);
+    if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        message: 'Amount must be greater than zero'
+        message: validation.error
       });
     }
+
+    // Use validated amount (already rounded to 2 decimals)
+    const validatedAmount = validation.value;
 
     if (senderId === recipientId) {
       return res.status(400).json({
@@ -265,7 +308,7 @@ const sendMoney = (req, res) => {
       });
     }
 
-    if (sender.wallet_balance < amount) {
+    if (sender.wallet_balance < validatedAmount) {
       return res.status(400).json({
         success: false,
         message: 'Insufficient balance'
@@ -289,7 +332,7 @@ const sendMoney = (req, res) => {
         SET wallet_balance = wallet_balance - ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(amount, senderId);
+      `).run(validatedAmount, senderId);
 
       // Add to recipient
       db.prepare(`
@@ -297,33 +340,33 @@ const sendMoney = (req, res) => {
         SET wallet_balance = wallet_balance + ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(amount, recipientId);
+      `).run(validatedAmount, recipientId);
 
       // Create transaction record for sender
       const description = note || `Transfer to ${recipient.full_name}`;
       db.prepare(`
         INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
         VALUES (?, 'transfer_sent', ?, 'completed', ?, ?)
-      `).run(senderId, amount, description, recipientId);
+      `).run(senderId, validatedAmount, description, recipientId);
 
       // Create transaction record for recipient
       const recipientDescription = note || `Transfer from ${sender.full_name}`;
       db.prepare(`
         INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
         VALUES (?, 'transfer_received', ?, 'completed', ?, ?)
-      `).run(recipientId, amount, recipientDescription, senderId);
+      `).run(recipientId, validatedAmount, recipientDescription, senderId);
     });
 
     // Execute the transaction
     transfer();
 
-    console.log(`✅ Transfer successful: User ${senderId} sent RM${amount} to User ${recipientId}`);
+    console.log(`✅ Transfer successful: User ${senderId} sent RM${validatedAmount.toFixed(2)} to User ${recipientId}`);
 
     res.status(200).json({
       success: true,
       message: 'Transfer successful',
       transfer: {
-        amount,
+        amount: validatedAmount,
         recipient: {
           name: recipient.full_name,
           accountId: recipient.account_id

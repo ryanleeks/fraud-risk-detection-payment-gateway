@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Send, DollarSign, Copy, QrCode } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
+import { validateAmount } from "@/utils/amountValidation"
 
 export function PaymentTab() {
   const [amount, setAmount] = useState("")
@@ -76,8 +77,10 @@ export function PaymentTab() {
     setSendSuccess(false)
 
     // Validate amount
-    if (!amount || parseFloat(amount) <= 0) {
-      setSendError("Please enter a valid amount")
+    const validation = validateAmount(amount)
+
+    if (!validation.isValid) {
+      setSendError(validation.error || "Invalid amount")
       return
     }
 
@@ -86,6 +89,9 @@ export function PaymentTab() {
       setSendError("Please lookup and confirm the recipient first")
       return
     }
+
+    // Use the validated and rounded amount
+    const validatedAmount = validation.value
 
     setSendLoading(true)
 
@@ -100,7 +106,7 @@ export function PaymentTab() {
         },
         body: JSON.stringify({
           recipientId: recipientData.id,
-          amount: parseFloat(amount),
+          amount: validatedAmount,
           note: note || undefined
         })
       })
@@ -179,7 +185,7 @@ export function PaymentTab() {
       {/* Amount Input */}
       <Card className="p-6">
         <Label htmlFor="amount" className="text-sm text-muted-foreground">
-          Amount
+          Amount (Max: RM 999,999.99)
         </Label>
         <div className="mt-2 flex items-center gap-2">
           <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -189,6 +195,9 @@ export function PaymentTab() {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            min="0.01"
+            max="999999.99"
+            step="0.01"
             className="w-full border-none bg-transparent text-4xl font-bold outline-none placeholder:text-muted-foreground/50"
           />
         </div>
