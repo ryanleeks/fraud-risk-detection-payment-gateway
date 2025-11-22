@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies separately for cache
+COPY package*.json ./
+RUN npm ci
+
+# Copy the rest at runtime via bind mount
+EXPOSE 8080
+
+CMD ["node", "src/server.js"]
