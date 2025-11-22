@@ -220,6 +220,40 @@ export function SplitPayTab() {
     }
   }
 
+  // Cancel split payment (creator only)
+  const handleCancelSplit = async (splitId: number) => {
+    if (!confirm("Are you sure you want to cancel this split payment? Participants who already paid will be refunded.")) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/splitpay/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          splitPaymentId: splitId
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        alert(`Split payment cancelled. ${data.refundedCount} participants refunded (RM${data.totalRefunded?.toFixed(2) || '0.00'})`)
+        loadMySplits()
+      } else {
+        alert(data.message || "Failed to cancel split payment")
+      }
+    } catch (err) {
+      console.error("Cancel split error:", err)
+      alert("Unable to connect to server")
+    }
+  }
+
   const calculateSplit = () => {
     if (!totalAmount || participants.length === 0) return 0
     const amount = parseFloat(totalAmount)
@@ -482,6 +516,19 @@ export function SplitPayTab() {
                   <X className="inline h-4 w-4 mr-1" />
                   You rejected this request
                 </div>
+              )}
+
+              {/* Cancel button for creator */}
+              {user && split.creator_id === user.id && (split.status === 'pending' || split.status === 'active') && (
+                <Button
+                  onClick={() => handleCancelSplit(split.id)}
+                  variant="destructive"
+                  className="w-full"
+                  size="sm"
+                >
+                  <X className="mr-1 h-4 w-4" />
+                  Cancel Split Payment
+                </Button>
               )}
             </Card>
           ))

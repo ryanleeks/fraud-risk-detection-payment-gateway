@@ -104,6 +104,7 @@ const getMySplitPayments = (req, res) => {
     const splits = db.prepare(`
       SELECT DISTINCT
         sp.id,
+        sp.creator_id,
         sp.title,
         sp.description,
         sp.total_amount,
@@ -246,7 +247,7 @@ const respondToSplitPayment = async (req, res) => {
 
 /**
  * PAY MY SHARE
- * Mark that user has paid their share
+ * Mark that user has paid their share and transfer money to creator
  */
 const payMyShare = async (req, res) => {
   try {
@@ -257,6 +258,25 @@ const payMyShare = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Please provide splitPaymentId'
+      });
+    }
+
+    // Get split payment details
+    const splitPayment = db.prepare(`
+      SELECT * FROM split_payments WHERE id = ?
+    `).get(splitPaymentId);
+
+    if (!splitPayment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Split payment not found'
+      });
+    }
+
+    if (splitPayment.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'This split payment has been cancelled'
       });
     }
 
@@ -287,12 +307,57 @@ const payMyShare = async (req, res) => {
       });
     }
 
-    // Mark as paid
-    db.prepare(`
-      UPDATE split_participants
-      SET paid = 1
-      WHERE split_payment_id = ? AND user_id = ?
-    `).run(splitPaymentId, userId);
+    // Check if payer has sufficient balance
+    const payer = db.prepare('SELECT wallet_balance, full_name FROM users WHERE id = ?').get(userId);
+    if (payer.wallet_balance < splitPayment.amount_per_person) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient balance to pay your share'
+      });
+    }
+
+    // Get creator info
+    const creator = db.prepare('SELECT full_name FROM users WHERE id = ?').get(splitPayment.creator_id);
+
+    // Perform payment in a transaction
+    const payment = db.transaction(() => {
+      // Deduct from participant
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance - ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(splitPayment.amount_per_person, userId);
+
+      // Add to creator
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(splitPayment.amount_per_person, splitPayment.creator_id);
+
+      // Mark as paid
+      db.prepare(`
+        UPDATE split_participants
+        SET paid = 1
+        WHERE split_payment_id = ? AND user_id = ?
+      `).run(splitPaymentId, userId);
+
+      // Create transaction records
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+        VALUES (?, 'split_payment_sent', ?, 'completed', ?, ?)
+      `).run(userId, splitPayment.amount_per_person, `Split payment: ${splitPayment.title}`, splitPayment.creator_id);
+
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+        VALUES (?, 'split_payment_received', ?, 'completed', ?, ?)
+      `).run(splitPayment.creator_id, splitPayment.amount_per_person, `Split payment: ${splitPayment.title} from ${payer.full_name}`, userId);
+    });
+
+    // Execute the transaction
+    payment();
 
     // Check if all participants have paid
     const allParticipants = db.prepare(`
@@ -313,10 +378,11 @@ const payMyShare = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Payment recorded successfully'
+      message: 'Payment recorded successfully',
+      amountPaid: splitPayment.amount_per_person
     });
 
-    console.log(`✅ User ${userId} paid their share for split payment ${splitPaymentId}`);
+    console.log(`✅ User ${userId} paid RM${splitPayment.amount_per_person.toFixed(2)} for split payment ${splitPaymentId}`);
 
   } catch (error) {
     console.error('❌ Pay share error:', error);
@@ -327,9 +393,151 @@ const payMyShare = async (req, res) => {
   }
 };
 
+/**
+ * CANCEL SPLIT PAYMENT
+ * Creator can cancel the split payment and refund all participants who paid
+ */
+const cancelSplitPayment = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { splitPaymentId } = req.body;
+
+    if (!splitPaymentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide splitPaymentId'
+      });
+    }
+
+    // Get split payment details
+    const splitPayment = db.prepare(`
+      SELECT * FROM split_payments WHERE id = ?
+    `).get(splitPaymentId);
+
+    if (!splitPayment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Split payment not found'
+      });
+    }
+
+    // Check if user is the creator
+    if (splitPayment.creator_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the creator can cancel this split payment'
+      });
+    }
+
+    // Check if already cancelled or completed
+    if (splitPayment.status === 'cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Split payment is already cancelled'
+      });
+    }
+
+    if (splitPayment.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel a completed split payment'
+      });
+    }
+
+    // Get all participants who have paid
+    const paidParticipants = db.prepare(`
+      SELECT spt.user_id, u.full_name
+      FROM split_participants spt
+      JOIN users u ON spt.user_id = u.id
+      WHERE spt.split_payment_id = ? AND spt.paid = 1 AND spt.user_id != ?
+    `).all(splitPaymentId, userId);
+
+    // Get creator info
+    const creator = db.prepare('SELECT wallet_balance, full_name FROM users WHERE id = ?').get(userId);
+
+    // Calculate total refund needed
+    const totalRefund = paidParticipants.length * splitPayment.amount_per_person;
+
+    // Check if creator has enough balance to refund
+    if (paidParticipants.length > 0 && creator.wallet_balance < totalRefund) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient balance to refund participants. Need RM${totalRefund.toFixed(2)}, have RM${creator.wallet_balance.toFixed(2)}`
+      });
+    }
+
+    // Perform cancellation and refunds in a transaction
+    const cancellation = db.transaction(() => {
+      // Refund each participant who paid
+      for (const participant of paidParticipants) {
+        // Deduct from creator
+        db.prepare(`
+          UPDATE users
+          SET wallet_balance = wallet_balance - ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(splitPayment.amount_per_person, userId);
+
+        // Refund to participant
+        db.prepare(`
+          UPDATE users
+          SET wallet_balance = wallet_balance + ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(splitPayment.amount_per_person, participant.user_id);
+
+        // Create refund transaction records
+        db.prepare(`
+          INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+          VALUES (?, 'split_payment_refund_sent', ?, 'completed', ?, ?)
+        `).run(userId, splitPayment.amount_per_person, `Refund for cancelled split: ${splitPayment.title}`, participant.user_id);
+
+        db.prepare(`
+          INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
+          VALUES (?, 'split_payment_refund_received', ?, 'completed', ?, ?)
+        `).run(participant.user_id, splitPayment.amount_per_person, `Refund from ${creator.full_name} for: ${splitPayment.title}`, userId);
+      }
+
+      // Mark split payment as cancelled
+      db.prepare(`
+        UPDATE split_payments
+        SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(splitPaymentId);
+
+      // Reset paid status for all participants (for record keeping)
+      db.prepare(`
+        UPDATE split_participants
+        SET paid = 0
+        WHERE split_payment_id = ?
+      `).run(splitPaymentId);
+    });
+
+    // Execute the transaction
+    cancellation();
+
+    res.status(200).json({
+      success: true,
+      message: 'Split payment cancelled successfully',
+      refundedCount: paidParticipants.length,
+      totalRefunded: totalRefund
+    });
+
+    console.log(`✅ User ${userId} cancelled split payment ${splitPaymentId}, refunded ${paidParticipants.length} participants (RM${totalRefund.toFixed(2)})`);
+
+  } catch (error) {
+    console.error('❌ Cancel split payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cancelling split payment'
+    });
+  }
+};
+
 module.exports = {
   createSplitPayment,
   getMySplitPayments,
   respondToSplitPayment,
-  payMyShare
+  payMyShare,
+  cancelSplitPayment
 };

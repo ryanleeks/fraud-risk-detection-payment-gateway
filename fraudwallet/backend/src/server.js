@@ -63,6 +63,7 @@ app.post('/api/splitpay/create', verifyToken, splitpay.createSplitPayment);
 app.get('/api/splitpay/my-splits', verifyToken, splitpay.getMySplitPayments);
 app.post('/api/splitpay/respond', verifyToken, splitpay.respondToSplitPayment);
 app.post('/api/splitpay/pay', verifyToken, splitpay.payMyShare);
+app.post('/api/splitpay/cancel', verifyToken, splitpay.cancelSplitPayment);
 
 // Wallet routes (protected)
 app.get('/api/wallet/balance', verifyToken, wallet.getWalletBalance);
