@@ -6,9 +6,29 @@ import { PaymentTab } from "@/components/payment-tab"
 import { SplitPayTab } from "@/components/splitpay-tab"
 import { ProfileTab } from "@/components/profile-tab"
 import { Home, Send, Users, User } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function WalletApp() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "splitpay" | "profile">("dashboard")
+  const { isAuthenticated, isLoading } = useAuth()
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <div className="text-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated, useAuth hook will redirect to login
+  // This is just a safeguard
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
