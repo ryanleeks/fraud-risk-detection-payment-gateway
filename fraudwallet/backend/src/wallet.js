@@ -1,6 +1,7 @@
 // Wallet and Stripe payment management
 const db = require('./database');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const fraudDetection = require('./fraud-detection');
 
 // Amount validation constants
 const AMOUNT_LIMITS = {
@@ -267,7 +268,7 @@ const getTransactionHistory = (req, res) => {
  * SEND MONEY TO ANOTHER USER
  * Transfer funds from one user to another
  */
-const sendMoney = (req, res) => {
+const sendMoney = async (req, res) => {
   try {
     const senderId = req.user.userId;
     const { recipientId, amount, note } = req.body;
@@ -300,7 +301,7 @@ const sendMoney = (req, res) => {
     }
 
     // Check sender exists and has sufficient balance
-    const sender = db.prepare('SELECT id, wallet_balance, full_name FROM users WHERE id = ?').get(senderId);
+    const sender = db.prepare('SELECT id, wallet_balance, full_name, created_at FROM users WHERE id = ?').get(senderId);
     if (!sender) {
       return res.status(404).json({
         success: false,
@@ -313,6 +314,42 @@ const sendMoney = (req, res) => {
         success: false,
         message: 'Insufficient balance'
       });
+    }
+
+    // 🔒 FRAUD DETECTION CHECK
+    const fraudCheck = await fraudDetection.analyzeFraudRisk({
+      userId: senderId,
+      amount: validatedAmount,
+      type: 'transfer_sent',
+      recipientId: recipientId
+    }, {
+      walletBalance: sender.wallet_balance,
+      accountCreated: sender.created_at
+    });
+
+    // Log fraud check result
+    console.log(`🔍 Fraud Check - User ${senderId}: Score ${fraudCheck.riskScore}/100 (${fraudCheck.riskLevel}) - Action: ${fraudCheck.action}`);
+
+    // Handle fraud detection result
+    if (fraudCheck.action === 'BLOCK') {
+      return res.status(403).json({
+        success: false,
+        message: 'Transaction blocked due to fraud risk',
+        fraudDetection: {
+          riskScore: fraudCheck.riskScore,
+          riskLevel: fraudCheck.riskLevel,
+          reason: 'Multiple fraud indicators detected',
+          triggeredRules: fraudCheck.triggeredRules.map(r => ({
+            name: r.ruleName,
+            description: r.description
+          }))
+        }
+      });
+    }
+
+    if (fraudCheck.action === 'REVIEW') {
+      // Flag for manual review but allow transaction
+      console.log(`⚠️  HIGH RISK TRANSACTION - Flagged for review: User ${senderId}, Amount: RM${validatedAmount.toFixed(2)}`);
     }
 
     // Check recipient exists

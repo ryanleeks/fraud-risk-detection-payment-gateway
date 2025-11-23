@@ -71,6 +71,12 @@ app.post('/api/wallet/add-funds', verifyToken, wallet.createPaymentIntent);
 app.get('/api/wallet/transactions', verifyToken, wallet.getTransactionHistory);
 app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 
+// Fraud Detection routes (protected)
+const fraudAPI = require('./fraudDetectionAPI');
+app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
+app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
+app.get('/api/fraud/recent-logs', verifyToken, fraudAPI.getRecentFraudLogs);
+
 // Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
