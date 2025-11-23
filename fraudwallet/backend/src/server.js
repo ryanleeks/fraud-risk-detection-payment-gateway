@@ -76,6 +76,9 @@ const fraudAPI = require('./fraudDetectionAPI');
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
 app.get('/api/fraud/recent-logs', verifyToken, fraudAPI.getRecentFraudLogs);
+app.get('/api/fraud/high-risk-users', verifyToken, fraudAPI.getHighRiskUsers);
+app.get('/api/fraud/top-flagged-users', verifyToken, fraudAPI.getTopFlaggedUsers);
+app.get('/api/fraud/user/:userId', verifyToken, fraudAPI.getUserFraudDetails);
 
 // Start the server
 const PORT = process.env.PORT || 8080;
