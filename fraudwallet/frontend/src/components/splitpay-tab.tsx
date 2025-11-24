@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle } from "lucide-react"
+import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react"
 
 export function SplitPayTab() {
   const [user, setUser] = useState<any>(null)
@@ -21,6 +21,7 @@ export function SplitPayTab() {
   const [mySplits, setMySplits] = useState<any[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [expandedSplitId, setExpandedSplitId] = useState<number | null>(null)
 
   // Load user data from localStorage
   useEffect(() => {
@@ -261,6 +262,31 @@ export function SplitPayTab() {
     return (amount / (participants.length + 1)).toFixed(2)
   }
 
+  const formatDateTime = (dateString: string) => {
+    if (!dateString) return "N/A"
+    const date = new Date(dateString)
+    return date.toLocaleString('en-MY', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const formatDateShort = (dateString: string) => {
+    if (!dateString) return "N/A"
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffDays === 0) return "Today"
+    if (diffDays === 1) return "Yesterday"
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString('en-MY', { month: 'short', day: 'numeric' })
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -402,9 +428,9 @@ export function SplitPayTab() {
             <Card className="p-4 bg-primary/5">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Each person pays</p>
-                <p className="text-3xl font-bold text-primary">${calculateSplit()}</p>
+                <p className="text-3xl font-bold text-primary">RM {calculateSplit()}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Total: ${totalAmount} ÷ {participants.length + 1} people
+                  Total: RM {totalAmount} ÷ {participants.length + 1} people
                 </p>
               </div>
             </Card>
@@ -442,35 +468,118 @@ export function SplitPayTab() {
         ) : (
           mySplits.map((split) => (
             <Card key={split.id} className="p-4 space-y-3">
+              {/* Header Section */}
               <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-bold">{split.title}</h4>
+                <div className="flex-1">
+                  <h4 className="font-bold text-lg">{split.title}</h4>
                   {split.description && (
-                    <p className="text-sm text-muted-foreground">{split.description}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{split.description}</p>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Created by {split.creator_name}
-                  </p>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3" />
+                    <span>Created by {split.creator_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>{formatDateShort(split.created_at)}</span>
+                    <span className="text-xs">• {formatDateTime(split.created_at)}</span>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">${split.amount_per_person}</p>
+                  <p className="text-2xl font-bold">RM {split.amount_per_person.toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">per person</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total: RM {split.total_amount.toFixed(2)}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex gap-2 text-xs">
+              {/* Status Badges */}
+              <div className="flex flex-wrap gap-2 text-xs">
                 <span className={`px-2 py-1 rounded-full ${
-                  split.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' :
-                  split.status === 'active' ? 'bg-blue-500/10 text-blue-600' :
-                  split.status === 'completed' ? 'bg-green-500/10 text-green-600' :
-                  'bg-red-500/10 text-red-600'
+                  split.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600 border border-yellow-500/20' :
+                  split.status === 'active' ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20' :
+                  split.status === 'completed' ? 'bg-green-500/10 text-green-600 border border-green-500/20' :
+                  'bg-red-500/10 text-red-600 border border-red-500/20'
                 }`}>
                   {split.status.toUpperCase()}
                 </span>
-                <span className="px-2 py-1 rounded-full bg-primary/10 text-primary">
+                <span className="px-2 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
                   {split.accepted_count}/{split.num_participants} accepted
                 </span>
+                <span className="px-2 py-1 rounded-full bg-muted text-foreground border">
+                  {split.participants?.filter((p: any) => p.paid).length || 0}/{split.num_participants} paid
+                </span>
               </div>
+
+              {/* View Details Button */}
+              <button
+                onClick={() => setExpandedSplitId(expandedSplitId === split.id ? null : split.id)}
+                className="w-full flex items-center justify-center gap-2 py-2 text-sm text-primary hover:bg-primary/5 rounded-lg transition-colors"
+              >
+                {expandedSplitId === split.id ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Hide Details
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    View Details ({split.num_participants} participants)
+                  </>
+                )}
+              </button>
+
+              {/* Expanded Details Section */}
+              {expandedSplitId === split.id && split.participants && (
+                <div className="border-t pt-3 space-y-2">
+                  <h5 className="text-sm font-semibold mb-2">Participants</h5>
+                  {split.participants.map((participant: any) => (
+                    <div key={participant.id} className="bg-muted/30 rounded-lg p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{participant.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{participant.account_id}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            participant.status === 'accepted' ? 'bg-green-500/10 text-green-600' :
+                            participant.status === 'rejected' ? 'bg-red-500/10 text-red-600' :
+                            'bg-yellow-500/10 text-yellow-600'
+                          }`}>
+                            {participant.status}
+                          </span>
+                          {participant.paid === 1 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600">
+                              PAID
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        {participant.responded_at && (
+                          <div className="flex items-center gap-1">
+                            <Check className="h-3 w-3" />
+                            <span>Responded: {formatDateTime(participant.responded_at)}</span>
+                          </div>
+                        )}
+                        {participant.paid === 1 && participant.paid_at && (
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            <span>Paid: {formatDateTime(participant.paid_at)}</span>
+                          </div>
+                        )}
+                        {participant.status === 'pending' && (
+                          <div className="flex items-center gap-1 text-yellow-600">
+                            <Clock className="h-3 w-3" />
+                            <span>Waiting for response</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Action Buttons */}
               {split.my_status === 'pending' && (
@@ -506,7 +615,7 @@ export function SplitPayTab() {
                     className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                     size="sm"
                   >
-                    Pay My Share (${split.amount_per_person})
+                    Pay My Share (RM {split.amount_per_person.toFixed(2)})
                   </Button>
                 </div>
               )}
