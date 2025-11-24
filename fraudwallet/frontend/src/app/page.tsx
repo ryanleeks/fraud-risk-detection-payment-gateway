@@ -5,11 +5,12 @@ import { DashboardTab } from "@/components/dashboard-tab"
 import { PaymentTab } from "@/components/payment-tab"
 import { SplitPayTab } from "@/components/splitpay-tab"
 import { ProfileTab } from "@/components/profile-tab"
-import { Home, Send, Users, User } from "lucide-react"
+import { FraudDashboardTab } from "@/components/fraud-dashboard-tab"
+import { Home, Send, Users, User, Shield } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 
 export default function WalletApp() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "splitpay" | "profile">("dashboard")
+  const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "splitpay" | "fraud" | "profile">("dashboard")
   const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading screen while checking authentication
@@ -50,19 +51,20 @@ export default function WalletApp() {
             {activeTab === "dashboard" && <DashboardTab />}
             {activeTab === "payment" && <PaymentTab />}
             {activeTab === "splitpay" && <SplitPayTab />}
+            {activeTab === "fraud" && <FraudDashboardTab />}
             {activeTab === "profile" && <ProfileTab />}
           </div>
 
           {/* Bottom Navigation */}
           <div className="border-t border-border bg-card">
-            <div className="flex items-center justify-around px-6 py-4">
+            <div className="flex items-center justify-around px-4 py-4">
               <button
                 onClick={() => setActiveTab("dashboard")}
                 className={`flex flex-col items-center gap-1 transition-colors ${
                   activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <Home className="h-6 w-6" />
+                <Home className="h-5 w-5" />
                 <span className="text-xs font-medium">Home</span>
               </button>
               <button
@@ -71,7 +73,7 @@ export default function WalletApp() {
                   activeTab === "payment" ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <Send className="h-6 w-6" />
+                <Send className="h-5 w-5" />
                 <span className="text-xs font-medium">Payment</span>
               </button>
               <button
@@ -80,8 +82,17 @@ export default function WalletApp() {
                   activeTab === "splitpay" ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <Users className="h-6 w-6" />
+                <Users className="h-5 w-5" />
                 <span className="text-xs font-medium">SplitPay</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("fraud")}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  activeTab === "fraud" ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Shield className="h-5 w-5" />
+                <span className="text-xs font-medium">Fraud</span>
               </button>
               <button
                 onClick={() => setActiveTab("profile")}
@@ -89,7 +100,7 @@ export default function WalletApp() {
                   activeTab === "profile" ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <User className="h-6 w-6" />
+                <User className="h-5 w-5" />
                 <span className="text-xs font-medium">Profile</span>
               </button>
             </div>
