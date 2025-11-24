@@ -131,6 +131,7 @@ const getMySplitPayments = (req, res) => {
           spt.status,
           spt.paid,
           spt.responded_at,
+          spt.paid_at,
           u.id,
           u.full_name,
           u.account_id
@@ -340,7 +341,7 @@ const payMyShare = async (req, res) => {
       // Mark as paid
       db.prepare(`
         UPDATE split_participants
-        SET paid = 1
+        SET paid = 1, paid_at = CURRENT_TIMESTAMP
         WHERE split_payment_id = ? AND user_id = ?
       `).run(splitPaymentId, userId);
 

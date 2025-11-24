@@ -176,6 +176,21 @@ const createSplitParticipantsTable = () => {
   console.log('✅ Split participants table is ready');
 };
 
+// Add missing columns to split_participants table
+const migrateSplitParticipantsTable = () => {
+  try {
+    const tableInfo = db.prepare('PRAGMA table_info(split_participants)').all();
+    const columnNames = tableInfo.map(col => col.name);
+
+    if (!columnNames.includes('paid_at')) {
+      db.exec("ALTER TABLE split_participants ADD COLUMN paid_at DATETIME");
+      console.log('✅ Added paid_at column to split_participants');
+    }
+  } catch (error) {
+    console.error('Error migrating split_participants table:', error.message);
+  }
+};
+
 // Create transactions table
 const createTransactionsTable = () => {
   const sql = `
@@ -206,6 +221,7 @@ const initDatabase = () => {
     createVerificationCodesTable();
     createSplitPaymentsTable();
     createSplitParticipantsTable();
+    migrateSplitParticipantsTable();
     createTransactionsTable();
     console.log('🎉 Database initialized successfully!');
   } catch (error) {
