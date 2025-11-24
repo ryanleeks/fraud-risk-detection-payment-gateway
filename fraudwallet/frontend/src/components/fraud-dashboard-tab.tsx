@@ -264,7 +264,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">High-Risk Users (Score ≥ 60)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
@@ -323,7 +323,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Top Flagged Users (Last 7 Days)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
@@ -376,7 +376,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Recent Fraud Checks</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
