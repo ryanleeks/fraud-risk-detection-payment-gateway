@@ -92,7 +92,7 @@ export default function WalletApp() {
                 }`}
               >
                 <Shield className="h-5 w-5" />
-                <span className="text-xs font-medium">Fraud</span>
+                <span className="text-xs font-medium">SecureTrack</span>
               </button>
               <button
                 onClick={() => setActiveTab("profile")}
