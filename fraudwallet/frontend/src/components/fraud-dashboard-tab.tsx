@@ -67,25 +67,35 @@ export function FraudDashboardTab() {
       // Fetch high-risk users
       const highRiskResponse = await fetch("http://localhost:8080/api/fraud/high-risk-users?limit=10&minScore=60", { headers })
       const highRiskData = await highRiskResponse.json()
-      if (highRiskData.success) {
+      if (highRiskData.success && highRiskData.users) {
         setHighRiskUsers(highRiskData.users)
+      } else {
+        setHighRiskUsers([])
       }
 
       // Fetch top flagged users
       const flaggedResponse = await fetch("http://localhost:8080/api/fraud/top-flagged-users?limit=10&days=7", { headers })
       const flaggedData = await flaggedResponse.json()
-      if (flaggedData.success) {
+      if (flaggedData.success && flaggedData.users) {
         setTopFlaggedUsers(flaggedData.users)
+      } else {
+        setTopFlaggedUsers([])
       }
 
       // Fetch recent logs
       const logsResponse = await fetch("http://localhost:8080/api/fraud/recent-logs?limit=20", { headers })
       const logsData = await logsResponse.json()
-      if (logsData.success) {
+      if (logsData.success && logsData.logs) {
         setRecentLogs(logsData.logs)
+      } else {
+        setRecentLogs([])
       }
     } catch (err) {
       console.error("Load fraud data error:", err)
+      // Reset to safe defaults on error
+      setHighRiskUsers([])
+      setTopFlaggedUsers([])
+      setRecentLogs([])
     } finally {
       setLoading(false)
     }
@@ -258,14 +268,14 @@ export function FraudDashboardTab() {
             </Button>
           </div>
 
-          {highRiskUsers.length === 0 ? (
+          {!highRiskUsers || highRiskUsers.length === 0 ? (
             <Card className="p-6 text-center text-muted-foreground">
               <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50 text-green-600" />
               <p>No high-risk users found</p>
             </Card>
           ) : (
             <div className="space-y-2">
-              {highRiskUsers.map((user) => (
+              {highRiskUsers?.map((user) => (
                 <Card key={user.id} className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -317,14 +327,14 @@ export function FraudDashboardTab() {
             </Button>
           </div>
 
-          {topFlaggedUsers.length === 0 ? (
+          {!topFlaggedUsers || topFlaggedUsers.length === 0 ? (
             <Card className="p-6 text-center text-muted-foreground">
               <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50 text-green-600" />
               <p>No flagged users in the last 7 days</p>
             </Card>
           ) : (
             <div className="space-y-2">
-              {topFlaggedUsers.map((user, idx) => (
+              {topFlaggedUsers?.map((user, idx) => (
                 <Card key={user.user_id} className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold">
@@ -370,14 +380,14 @@ export function FraudDashboardTab() {
             </Button>
           </div>
 
-          {recentLogs.length === 0 ? (
+          {!recentLogs || recentLogs.length === 0 ? (
             <Card className="p-6 text-center text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>No recent fraud checks</p>
             </Card>
           ) : (
             <div className="space-y-2">
-              {recentLogs.map((log) => (
+              {recentLogs?.map((log) => (
                 <Card key={log.id} className="p-3">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
