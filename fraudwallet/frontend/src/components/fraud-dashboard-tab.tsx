@@ -181,10 +181,10 @@ export function FraudDashboardTab() {
           </div>
         </div>
 
-      {/* Overview Cards */}
-      {activeView === "overview" && (
-        <>
-          <div className="grid grid-cols-2 gap-4">
+        {/* Overview Cards */}
+        {activeView === "overview" && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
             <Card className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -265,12 +265,12 @@ export function FraudDashboardTab() {
               Recent Logs
             </Button>
           </div>
-        </>
-      )}
+          </>
+        )}
 
-      {/* High-Risk Users View */}
-      {activeView === "high-risk" && (
-        <div className="space-y-4">
+        {/* High-Risk Users View */}
+        {activeView === "high-risk" && (
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">High-Risk Users (Score ≥ 60)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
@@ -324,12 +324,12 @@ export function FraudDashboardTab() {
               ))}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Top Flagged Users View */}
-      {activeView === "flagged" && (
-        <div className="space-y-4">
+        {/* Top Flagged Users View */}
+        {activeView === "flagged" && (
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Top Flagged Users (Last 7 Days)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
@@ -377,12 +377,12 @@ export function FraudDashboardTab() {
               ))}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Recent Logs View */}
-      {activeView === "recent" && (
-        <div className="space-y-4">
+        {/* Recent Logs View */}
+        {activeView === "recent" && (
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Recent Fraud Checks</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
@@ -416,8 +416,8 @@ export function FraudDashboardTab() {
               ))}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
       </div>
     </div>
   )
