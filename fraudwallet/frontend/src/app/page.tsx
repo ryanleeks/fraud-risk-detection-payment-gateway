@@ -60,8 +60,10 @@ export default function WalletApp() {
             <div className="flex items-center justify-around px-4 py-4">
               <button
                 onClick={() => setActiveTab("dashboard")}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 transition-all duration-200 px-3 py-2 rounded-lg ${
+                  activeTab === "dashboard"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-muted hover:scale-105"
                 }`}
               >
                 <Home className="h-5 w-5" />
@@ -69,8 +71,10 @@ export default function WalletApp() {
               </button>
               <button
                 onClick={() => setActiveTab("payment")}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  activeTab === "payment" ? "text-primary" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 transition-all duration-200 px-3 py-2 rounded-lg ${
+                  activeTab === "payment"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-muted hover:scale-105"
                 }`}
               >
                 <Send className="h-5 w-5" />
@@ -78,8 +82,10 @@ export default function WalletApp() {
               </button>
               <button
                 onClick={() => setActiveTab("splitpay")}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  activeTab === "splitpay" ? "text-primary" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 transition-all duration-200 px-3 py-2 rounded-lg ${
+                  activeTab === "splitpay"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-muted hover:scale-105"
                 }`}
               >
                 <Users className="h-5 w-5" />
@@ -87,8 +93,10 @@ export default function WalletApp() {
               </button>
               <button
                 onClick={() => setActiveTab("fraud")}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  activeTab === "fraud" ? "text-primary" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 transition-all duration-200 px-3 py-2 rounded-lg ${
+                  activeTab === "fraud"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-muted hover:scale-105"
                 }`}
               >
                 <Shield className="h-5 w-5" />
@@ -96,8 +104,10 @@ export default function WalletApp() {
               </button>
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  activeTab === "profile" ? "text-primary" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 transition-all duration-200 px-3 py-2 rounded-lg ${
+                  activeTab === "profile"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-muted hover:scale-105"
                 }`}
               >
                 <User className="h-5 w-5" />
