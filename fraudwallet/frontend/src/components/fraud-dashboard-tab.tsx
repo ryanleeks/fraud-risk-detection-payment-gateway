@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { usePullToRefresh } from "@/hooks/usePullToRefresh"
+import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 
 interface FraudLog {
   id: number
@@ -46,10 +48,6 @@ export function FraudDashboardTab() {
   const [recentLogs, setRecentLogs] = useState<FraudLog[]>([])
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<"overview" | "high-risk" | "flagged" | "recent">("overview")
-
-  useEffect(() => {
-    loadFraudData()
-  }, [])
 
   const loadFraudData = async () => {
     setLoading(true)
@@ -100,6 +98,15 @@ export function FraudDashboardTab() {
       setLoading(false)
     }
   }
+
+  // Pull to refresh
+  const { containerRef, isPulling, pullDistance, isRefreshing, threshold } = usePullToRefresh({
+    onRefresh: loadFraudData,
+  })
+
+  useEffect(() => {
+    loadFraudData()
+  }, [])
 
   const getRiskLevelColor = (level: string) => {
     switch (level.toLowerCase()) {
@@ -156,20 +163,23 @@ export function FraudDashboardTab() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-7 w-7 text-primary" />
-            Fraud Detection
-          </h1>
-          <p className="text-sm text-muted-foreground">Monitor fraud risks and patterns</p>
+    <div ref={containerRef} className="relative h-full overflow-y-auto">
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={threshold}
+      />
+      <div className="space-y-6 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Shield className="h-7 w-7 text-primary" />
+              Fraud Detection
+            </h1>
+            <p className="text-sm text-muted-foreground">Monitor fraud risks and patterns</p>
+          </div>
         </div>
-        <Button onClick={loadFraudData} variant="outline" size="sm">
-          Refresh
-        </Button>
-      </div>
 
       {/* Overview Cards */}
       {activeView === "overview" && (
@@ -408,6 +418,7 @@ export function FraudDashboardTab() {
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

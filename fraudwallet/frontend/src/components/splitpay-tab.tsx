@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react"
+import { usePullToRefresh } from "@/hooks/usePullToRefresh"
+import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 
 export function SplitPayTab() {
   const [user, setUser] = useState<any>(null)
@@ -20,21 +22,10 @@ export function SplitPayTab() {
   const [createError, setCreateError] = useState("")
   const [mySplits, setMySplits] = useState<any[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   const [expandedSplitId, setExpandedSplitId] = useState<number | null>(null)
-
-  // Load user data from localStorage
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-    loadMySplits()
-  }, [])
 
   // Load my split payments
   const loadMySplits = async () => {
-    setRefreshing(true)
     try {
       const token = localStorage.getItem("token")
       const response = await fetch("http://localhost:8080/api/splitpay/my-splits", {
@@ -50,10 +41,22 @@ export function SplitPayTab() {
       }
     } catch (err) {
       console.error("Load splits error:", err)
-    } finally {
-      setRefreshing(false)
     }
   }
+
+  // Pull to refresh
+  const { containerRef, isPulling, pullDistance, isRefreshing, threshold } = usePullToRefresh({
+    onRefresh: loadMySplits,
+  })
+
+  // Load user data from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    }
+    loadMySplits()
+  }, [])
 
   // Lookup recipient
   const handleLookupRecipient = async () => {
@@ -288,8 +291,14 @@ export function SplitPayTab() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
+    <div ref={containerRef} className="relative h-full overflow-y-auto">
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={threshold}
+      />
+      <div className="space-y-6 p-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">SplitPay</h1>
@@ -448,17 +457,7 @@ export function SplitPayTab() {
 
       {/* My Split Payments */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">My Split Payments</h3>
-          <Button
-            onClick={loadMySplits}
-            variant="outline"
-            size="sm"
-            disabled={refreshing}
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </Button>
-        </div>
+        <h3 className="text-lg font-bold">My Split Payments</h3>
 
         {mySplits.length === 0 ? (
           <Card className="p-6 text-center text-muted-foreground">
@@ -642,6 +641,7 @@ export function SplitPayTab() {
             </Card>
           ))
         )}
+      </div>
       </div>
     </div>
   )
