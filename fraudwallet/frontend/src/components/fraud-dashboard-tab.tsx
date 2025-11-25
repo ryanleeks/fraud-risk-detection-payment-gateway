@@ -179,6 +179,15 @@ export function FraudDashboardTab() {
             </h1>
             <p className="text-sm text-muted-foreground">Monitor fraud risks and patterns</p>
           </div>
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Shield className="h-7 w-7 text-primary" />
+            SecureTrack
+          </h1>
+          <p className="text-sm text-muted-foreground">Track your wallet's fraud risks and patterns</p>
         </div>
 
         {/* Overview Cards */}
@@ -274,7 +283,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">High-Risk Users (Score ≥ 60)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
@@ -333,7 +342,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Top Flagged Users (Last 7 Days)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
@@ -386,7 +395,7 @@ export function FraudDashboardTab() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Recent Fraud Checks</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-              Back
+              ← Back
             </Button>
           </div>
 
