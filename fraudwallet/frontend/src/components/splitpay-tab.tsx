@@ -302,7 +302,7 @@ export function SplitPayTab() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">SplitPay</h1>
-          <p className="text-sm text-muted-foreground">Split bills with friends</p>
+          <p className="text-sm text-muted-foreground">Split bills with peers</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10">
           <Users className="h-5 w-5 text-accent" />

@@ -306,6 +306,7 @@ export function DashboardTab() {
       </Card>
 
       {/* Quick Actions */}
+      {/*
       <div className="grid grid-cols-2 gap-4">
         <Card className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
@@ -326,6 +327,7 @@ export function DashboardTab() {
           </div>
         </Card>
       </div>
+      */}
 
       {/* Recent Transactions */}
       <div>
