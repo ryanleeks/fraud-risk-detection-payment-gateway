@@ -9,6 +9,8 @@ import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard } 
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { validateAmount, formatAmount, AMOUNT_LIMITS } from "@/utils/amountValidation"
+import { usePullToRefresh } from "@/hooks/usePullToRefresh"
+import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
@@ -111,24 +113,11 @@ export function DashboardTab() {
   const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [refreshing, setRefreshing] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
 
-  // Load user data and wallet info
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      const userData = JSON.parse(storedUser)
-      setUser(userData)
-      setWalletBalance(userData.walletBalance || 0)
-    }
-    loadWalletData()
-  }, [])
-
   // Load wallet balance and transactions
   const loadWalletData = async () => {
-    setRefreshing(true)
     try {
       const token = localStorage.getItem("token")
 
@@ -164,10 +153,24 @@ export function DashboardTab() {
       }
     } catch (err) {
       console.error("Load wallet data error:", err)
-    } finally {
-      setRefreshing(false)
     }
   }
+
+  // Pull to refresh
+  const { containerRef, isPulling, pullDistance, isRefreshing, threshold } = usePullToRefresh({
+    onRefresh: loadWalletData,
+  })
+
+  // Load user data and wallet info
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      const userData = JSON.parse(storedUser)
+      setUser(userData)
+      setWalletBalance(userData.walletBalance || 0)
+    }
+    loadWalletData()
+  }, [])
 
   // Handle add funds - Create payment intent
   const handleAddFunds = async () => {
@@ -262,8 +265,14 @@ export function DashboardTab() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
+    <div ref={containerRef} className="relative h-full overflow-y-auto">
+      <PullToRefreshIndicator
+        pullDistance={pullDistance}
+        isRefreshing={isRefreshing}
+        threshold={threshold}
+      />
+      <div className="space-y-6 p-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">
@@ -281,7 +290,7 @@ export function DashboardTab() {
         <div className="relative z-10">
           <p className="text-sm opacity-90">Wallet Balance</p>
           <h2 className="mt-2 text-4xl font-bold">RM {walletBalance.toFixed(2)}</h2>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4">
             <Button
               onClick={() => setShowAddFundsModal(true)}
               className="bg-white text-primary hover:bg-white/90"
@@ -289,15 +298,6 @@ export function DashboardTab() {
             >
               <Plus className="mr-1 h-4 w-4" />
               Add Funds
-            </Button>
-            <Button
-              onClick={loadWalletData}
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10"
-              size="sm"
-              disabled={refreshing}
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </div>
         </div>
@@ -482,6 +482,7 @@ export function DashboardTab() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
