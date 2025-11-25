@@ -175,19 +175,10 @@ export function FraudDashboardTab() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Shield className="h-7 w-7 text-primary" />
-              Fraud Detection
+              SecureTrack
             </h1>
-            <p className="text-sm text-muted-foreground">Monitor fraud risks and patterns</p>
+            <p className="text-sm text-muted-foreground">Track your wallet's fraud risks and patterns</p>
           </div>
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-7 w-7 text-primary" />
-            SecureTrack
-          </h1>
-          <p className="text-sm text-muted-foreground">Track your wallet's fraud risks and patterns</p>
         </div>
 
         {/* Overview Cards */}
