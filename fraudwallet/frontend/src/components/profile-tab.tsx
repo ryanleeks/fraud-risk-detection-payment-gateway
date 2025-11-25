@@ -523,7 +523,7 @@ export function ProfileTab() {
       {/* Account Settings Modal - Password & Terminate Account */}
       {showAccountSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="mb-4 text-xl font-bold">Account Settings</h3>
 
             {error && (
