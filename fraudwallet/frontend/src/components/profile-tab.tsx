@@ -30,8 +30,11 @@ export function ProfileTab() {
 
   // 2FA states
   const [twofaPassword, setTwofaPassword] = useState("")
+  const [twofaCode, setTwofaCode] = useState("")
   const [twofaMethodPassword, setTwofaMethodPassword] = useState("")
   const [selectedTwofaMethod, setSelectedTwofaMethod] = useState("email")
+  const [showEnableConfirmation, setShowEnableConfirmation] = useState(false)
+  const [showDisableForm, setShowDisableForm] = useState(false)
 
   // Load user data from localStorage
   useEffect(() => {
@@ -251,10 +254,53 @@ export function ProfileTab() {
     }
   }
 
-  // Toggle 2FA handler
-  const handleToggle2FA = async (enabled: boolean) => {
+  // Enable 2FA handler (no password required, just confirmation)
+  const handleEnable2FA = async () => {
+    setLoading(true)
+    setError("")
+    setSuccessMessage("")
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/2fa/toggle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ enabled: true })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update user in localStorage
+        const updatedUser = { ...user, twofaEnabled: data.twofaEnabled }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUser(updatedUser)
+        setShowEnableConfirmation(false)
+        setSuccessMessage(data.message || "2FA has been enabled successfully")
+      } else {
+        setError(data.message || "Failed to enable 2FA")
+      }
+    } catch (err) {
+      console.error("Enable 2FA error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Disable 2FA handler (requires password + 2FA code)
+  const handleDisable2FA = async () => {
     if (!twofaPassword) {
-      setError("Password is required to change 2FA settings")
+      setError("Password is required to disable 2FA")
+      return
+    }
+
+    if (!twofaCode) {
+      setError("2FA code is required to disable 2FA")
       return
     }
 
@@ -271,7 +317,11 @@ export function ProfileTab() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ enabled, password: twofaPassword })
+        body: JSON.stringify({
+          enabled: false,
+          password: twofaPassword,
+          code: twofaCode
+        })
       })
 
       const data = await response.json()
@@ -282,12 +332,14 @@ export function ProfileTab() {
         localStorage.setItem("user", JSON.stringify(updatedUser))
         setUser(updatedUser)
         setTwofaPassword("")
-        setSuccessMessage(data.message)
+        setTwofaCode("")
+        setShowDisableForm(false)
+        setSuccessMessage(data.message || "2FA has been disabled successfully")
       } else {
-        setError(data.message || "Failed to update 2FA settings")
+        setError(data.message || "Failed to disable 2FA")
       }
     } catch (err) {
-      console.error("Toggle 2FA error:", err)
+      console.error("Disable 2FA error:", err)
       setError("Unable to connect to server")
     } finally {
       setLoading(false)
@@ -773,11 +825,13 @@ export function ProfileTab() {
                       user?.twofaEnabled ? "bg-primary" : "bg-muted-foreground/30"
                     }`}
                     onClick={() => {
-                      if (!twofaPassword && !user?.twofaEnabled) {
-                        setError("Please enter your password below to enable 2FA")
-                        return
+                      if (user?.twofaEnabled) {
+                        // Show disable form (requires password + 2FA code)
+                        setShowDisableForm(true)
+                      } else {
+                        // Show enable confirmation (no password required)
+                        setShowEnableConfirmation(true)
                       }
-                      handleToggle2FA(!user?.twofaEnabled)
                     }}
                   >
                     <span
@@ -786,16 +840,6 @@ export function ProfileTab() {
                       }`}
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Password</label>
-                  <Input
-                    type="password"
-                    value={twofaPassword}
-                    onChange={(e) => setTwofaPassword(e.target.value)}
-                    placeholder="Enter your password to enable/disable 2FA"
-                  />
                 </div>
               </div>
 
@@ -927,6 +971,117 @@ export function ProfileTab() {
               >
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enable 2FA Confirmation Modal */}
+      {showEnableConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold">Enable 2FA</h3>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <p className="mb-6 text-sm text-muted-foreground">
+              Are you sure you want to enable Two-Factor Authentication? This will add an extra layer of security to your account.
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleEnable2FA}
+                disabled={loading}
+                className="flex-1 bg-primary text-primary-foreground"
+              >
+                {loading ? "Enabling..." : "Confirm"}
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEnableConfirmation(false)
+                  setError("")
+                }}
+                disabled={loading}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disable 2FA Form Modal */}
+      {showDisableForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold">Disable 2FA</h3>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <p className="mb-4 text-sm text-muted-foreground">
+              To disable Two-Factor Authentication, please enter your password and current 2FA code.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="disable-password">Password</Label>
+                <Input
+                  id="disable-password"
+                  type="password"
+                  value={twofaPassword}
+                  onChange={(e) => setTwofaPassword(e.target.value)}
+                  placeholder="Enter your password"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="disable-code">2FA Code</Label>
+                <Input
+                  id="disable-code"
+                  type="text"
+                  value={twofaCode}
+                  onChange={(e) => setTwofaCode(e.target.value)}
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Check your {user?.twofaMethod === "email" ? "email" : "phone"} for the code
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleDisable2FA}
+                  disabled={loading}
+                  variant="destructive"
+                  className="flex-1"
+                >
+                  {loading ? "Disabling..." : "Disable 2FA"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowDisableForm(false)
+                    setError("")
+                    setTwofaPassword("")
+                    setTwofaCode("")
+                  }}
+                  disabled={loading}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>

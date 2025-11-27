@@ -271,7 +271,13 @@ export function DashboardTab() {
         isRefreshing={isRefreshing}
         threshold={threshold}
       />
-      <div className="space-y-6 p-6">
+      <div
+        className="space-y-6 p-6"
+        style={{
+          transform: `translateY(${isPulling ? pullDistance : 0}px)`,
+          transition: isPulling ? 'none' : 'transform 0.2s ease-out'
+        }}
+      >
         {/* Header */}
       <div className="flex items-center justify-between">
         <div>

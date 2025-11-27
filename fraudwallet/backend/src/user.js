@@ -2,7 +2,7 @@
 const bcrypt = require('bcrypt');
 const db = require('./database');
 const { validatePhoneNumber, canChangePhone } = require('./validation');
-const { generateCode, storeCode, sendEmailCode, sendSMSCode } = require('./twofa');
+const { generateCode, storeCode, verifyCode, sendEmailCode, sendSMSCode } = require('./twofa');
 
 const SALT_ROUNDS = 10;
 
@@ -325,16 +325,18 @@ const changePhoneNumber = async (req, res) => {
 /**
  * TOGGLE 2FA
  * Enable or disable two-factor authentication
+ * - Enable: No password required, just confirmation
+ * - Disable: Requires password AND 2FA code verification
  */
 const toggle2FA = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { enabled, password } = req.body;
+    const { enabled, password, code } = req.body;
 
-    if (typeof enabled !== 'boolean' || !password) {
+    if (typeof enabled !== 'boolean') {
       return res.status(400).json({
         success: false,
-        message: 'Please provide enabled status and password'
+        message: 'Please provide enabled status'
       });
     }
 
@@ -348,26 +350,66 @@ const toggle2FA = async (req, res) => {
       });
     }
 
-    // Verify password
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
-    if (!passwordMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Incorrect password'
+    // Different requirements for enabling vs disabling
+    if (enabled) {
+      // ENABLING 2FA: No password required, just enable it
+      db.prepare('UPDATE users SET twofa_enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(userId);
+
+      res.status(200).json({
+        success: true,
+        message: '2FA enabled successfully',
+        twofaEnabled: true
       });
+
+      console.log(`✅ User ${userId} enabled 2FA`);
+
+    } else {
+      // DISABLING 2FA: Requires password AND 2FA code
+      if (!password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password is required to disable 2FA'
+        });
+      }
+
+      if (!code) {
+        return res.status(400).json({
+          success: false,
+          message: '2FA code is required to disable 2FA'
+        });
+      }
+
+      // Verify password
+      const passwordMatch = await bcrypt.compare(password, user.password_hash);
+      if (!passwordMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Incorrect password'
+        });
+      }
+
+      // Verify 2FA code
+      const codeValid = verifyCode(userId, code);
+      if (!codeValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid or expired 2FA code'
+        });
+      }
+
+      // Update 2FA status
+      db.prepare('UPDATE users SET twofa_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(userId);
+
+      res.status(200).json({
+        success: true,
+        message: '2FA disabled successfully',
+        twofaEnabled: false
+      });
+
+      console.log(`✅ User ${userId} disabled 2FA`);
     }
-
-    // Update 2FA status
-    db.prepare('UPDATE users SET twofa_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(enabled ? 1 : 0, userId);
-
-    res.status(200).json({
-      success: true,
-      message: `2FA ${enabled ? 'enabled' : 'disabled'} successfully`,
-      twofaEnabled: enabled
-    });
-
-    console.log(`✅ User ${userId} ${enabled ? 'enabled' : 'disabled'} 2FA`);
 
   } catch (error) {
     console.error('❌ Toggle 2FA error:', error);
