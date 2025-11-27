@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label";
 import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX, Copy, QrCode } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
 
