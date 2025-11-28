@@ -461,7 +461,7 @@ const sendDisableCode = async (req, res) => {
 
     // Send code based on user's 2FA method
     if (user.twofa_method === 'email') {
-      await sendEmailCode(user.email, code);
+      await sendEmailCode(user.email, user.full_name, code);
     } else if (user.twofa_method === 'phone') {
       await sendSMSCode(user.phone_number, code);
     }
