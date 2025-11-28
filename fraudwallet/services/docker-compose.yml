@@ -1,0 +1,233 @@
+version: '3.9'
+
+# Production Docker Compose Configuration
+# FraudWallet Microservices Architecture
+
+services:
+  # ========================================
+  # INFRASTRUCTURE SERVICES
+  # ========================================
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: fraudwallet-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: fraudwallet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./shared/database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - fraudwallet-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: fraudwallet-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - fraudwallet-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ========================================
+  # MICROSERVICES
+  # ========================================
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
+    container_name: fraudwallet-auth-service
+    environment:
+      - PORT=3001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/user-service/Dockerfile
+    container_name: fraudwallet-user-service
+    environment:
+      - PORT=3002
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # Wallet Service
+  wallet-service:
+    build:
+      context: ..
+      dockerfile: services/wallet-service/Dockerfile
+    container_name: fraudwallet-wallet-service
+    environment:
+      - PORT=3003
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - FRAUD_DETECTION_SERVICE=http://fraud-detection-service:3005
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fraud-detection-service:
+        condition: service_started
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # SplitPay Service
+  splitpay-service:
+    build:
+      context: ..
+      dockerfile: services/splitpay-service/Dockerfile
+    container_name: fraudwallet-splitpay-service
+    environment:
+      - PORT=3004
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - WALLET_SERVICE=http://wallet-service:3003
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wallet-service:
+        condition: service_started
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # Fraud Detection Service
+  fraud-detection-service:
+    build:
+      context: ..
+      dockerfile: services/fraud-detection-service/Dockerfile
+    container_name: fraudwallet-fraud-detection-service
+    environment:
+      - PORT=3005
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+    ports:
+      - "3005:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: fraudwallet-api-gateway
+    environment:
+      - PORT=8080
+      - AUTH_SERVICE=http://auth-service:3001
+      - USER_SERVICE=http://user-service:3002
+      - WALLET_SERVICE=http://wallet-service:3003
+      - SPLITPAY_SERVICE=http://splitpay-service:3004
+      - FRAUD_DETECTION_SERVICE=http://fraud-detection-service:3005
+      - ALLOWED_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - user-service
+      - wallet-service
+      - splitpay-service
+      - fraud-detection-service
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    container_name: fraudwallet-frontend
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api-gateway
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+# ========================================
+# NETWORKS & VOLUMES
+# ========================================
+
+networks:
+  fraudwallet-network:
+    driver: bridge
+    name: fraudwallet-network
+
+volumes:
+  postgres_data:
+    name: fraudwallet-postgres-data

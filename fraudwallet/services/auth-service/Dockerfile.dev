@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy shared dependencies
+COPY services/shared /app/shared
+
+# Copy package files
+COPY services/auth-service/package*.json ./
+
+# Install dependencies including dev dependencies
+RUN npm install
+
+# Copy source code
+COPY services/auth-service/src ./src
+COPY services/auth-service/.env.example ./.env
+
+# Expose port
+EXPOSE 3001
+
+# Start with nodemon for hot reload
+CMD ["npm", "run", "dev"]

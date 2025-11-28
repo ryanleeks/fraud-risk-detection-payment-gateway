@@ -1,0 +1,9 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY services/shared /app/shared
+COPY services/splitpay-service/package*.json ./
+RUN npm install
+COPY services/splitpay-service/src ./src
+COPY services/splitpay-service/.env.example ./.env
+EXPOSE 3004
+CMD ["npm", "run", "dev"]

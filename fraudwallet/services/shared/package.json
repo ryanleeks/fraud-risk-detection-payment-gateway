@@ -1,0 +1,21 @@
+{
+  "name": "@fraudwallet/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and modules for FraudWallet microservices",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "node database/migrate-from-sqlite.js"
+  },
+  "keywords": [
+    "fraudwallet",
+    "shared",
+    "microservices"
+  ],
+  "author": "Ryan Lee",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "jsonwebtoken": "^9.0.2",
+    "better-sqlite3": "^9.2.2"
+  }
+}

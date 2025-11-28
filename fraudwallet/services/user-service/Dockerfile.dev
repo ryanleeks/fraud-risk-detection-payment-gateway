@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy shared dependencies
+COPY services/shared /app/shared
+
+# Copy package files
+COPY services/user-service/package*.json ./
+
+# Install dependencies including dev
+RUN npm install
+
+# Copy source code
+COPY services/user-service/src ./src
+COPY services/user-service/.env.example ./.env
+
+# Expose port
+EXPOSE 3002
+
+# Start with nodemon
+CMD ["npm", "run", "dev"]
