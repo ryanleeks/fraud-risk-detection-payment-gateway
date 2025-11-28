@@ -51,6 +51,7 @@ app.post('/api/user/terminate', verifyToken, user.terminateAccount);
 
 // 2FA management routes (protected)
 app.post('/api/user/2fa/toggle', verifyToken, user.toggle2FA);
+app.post('/api/user/2fa/send-disable-code', verifyToken, user.sendDisableCode);
 app.put('/api/user/2fa/method', verifyToken, user.update2FAMethod);
 app.post('/api/user/2fa/test', verifyToken, user.send2FATest);
 
