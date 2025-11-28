@@ -1,0 +1,22 @@
+{
+  "name": "@fraudwallet/fraud-detection-service",
+  "version": "1.0.0",
+  "description": "Fraud detection and risk assessment service for FraudWallet",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "author": "Ryan Lee",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

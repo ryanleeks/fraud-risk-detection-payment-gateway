@@ -1,0 +1,220 @@
+version: '3.9'
+
+# Development Docker Compose Configuration
+# with hot-reload and development tools
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: fraudwallet-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: fraudwallet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./shared/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./shared/database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    networks:
+      - fraudwallet-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: fraudwallet-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - fraudwallet-dev
+
+  # Auth Service (with hot-reload)
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile.dev
+    container_name: fraudwallet-auth-dev
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev-secret-key
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./auth-service/src:/app/src
+      - ./shared:/app/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fraudwallet-dev
+
+  # User Service (with hot-reload)
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/user-service/Dockerfile.dev
+    container_name: fraudwallet-user-dev
+    environment:
+      - PORT=3002
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev-secret-key
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./user-service/src:/app/src
+      - ./shared:/app/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fraudwallet-dev
+
+  # Wallet Service (with hot-reload)
+  wallet-service:
+    build:
+      context: ..
+      dockerfile: services/wallet-service/Dockerfile.dev
+    container_name: fraudwallet-wallet-dev
+    environment:
+      - PORT=3003
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev-secret-key
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - FRAUD_DETECTION_SERVICE=http://fraud-detection-service:3005
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./wallet-service/src:/app/src
+      - ./shared:/app/shared
+    depends_on:
+      - postgres
+      - fraud-detection-service
+    networks:
+      - fraudwallet-dev
+
+  # SplitPay Service (with hot-reload)
+  splitpay-service:
+    build:
+      context: ..
+      dockerfile: services/splitpay-service/Dockerfile.dev
+    container_name: fraudwallet-splitpay-dev
+    environment:
+      - PORT=3004
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev-secret-key
+      - WALLET_SERVICE=http://wallet-service:3003
+    ports:
+      - "3004:3004"
+    volumes:
+      - ./splitpay-service/src:/app/src
+      - ./shared:/app/shared
+    depends_on:
+      - postgres
+      - wallet-service
+    networks:
+      - fraudwallet-dev
+
+  # Fraud Detection Service (with hot-reload)
+  fraud-detection-service:
+    build:
+      context: ..
+      dockerfile: services/fraud-detection-service/Dockerfile.dev
+    container_name: fraudwallet-fraud-dev
+    environment:
+      - PORT=3005
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=fraudwallet
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev-secret-key
+    ports:
+      - "3005:3005"
+    volumes:
+      - ./fraud-detection-service/src:/app/src
+      - ./shared:/app/shared
+    depends_on:
+      - postgres
+    networks:
+      - fraudwallet-dev
+
+  # API Gateway (with hot-reload)
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile.dev
+    container_name: fraudwallet-gateway-dev
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - AUTH_SERVICE=http://auth-service:3001
+      - USER_SERVICE=http://user-service:3002
+      - WALLET_SERVICE=http://wallet-service:3003
+      - SPLITPAY_SERVICE=http://splitpay-service:3004
+      - FRAUD_DETECTION_SERVICE=http://fraud-detection-service:3005
+      - ALLOWED_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./api-gateway/src:/app/src
+    depends_on:
+      - auth-service
+      - user-service
+      - wallet-service
+      - splitpay-service
+      - fraud-detection-service
+    networks:
+      - fraudwallet-dev
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    container_name: fraudwallet-frontend-dev
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8080
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api-gateway
+    networks:
+      - fraudwallet-dev
+
+networks:
+  fraudwallet-dev:
+    driver: bridge
+    name: fraudwallet-dev-network
+
+volumes:
+  postgres_dev_data:
+    name: fraudwallet-postgres-dev-data
