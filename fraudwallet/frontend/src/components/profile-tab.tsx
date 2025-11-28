@@ -35,6 +35,7 @@ export function ProfileTab() {
   const [selectedTwofaMethod, setSelectedTwofaMethod] = useState("email")
   const [showEnableConfirmation, setShowEnableConfirmation] = useState(false)
   const [showDisableForm, setShowDisableForm] = useState(false)
+  const [disableCodeSent, setDisableCodeSent] = useState(false)
 
   // Load user data from localStorage
   useEffect(() => {
@@ -286,6 +287,45 @@ export function ProfileTab() {
       }
     } catch (err) {
       console.error("Enable 2FA error:", err)
+      setError("Unable to connect to server")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Send 2FA code for disabling (requires password first)
+  const handleSendDisableCode = async () => {
+    if (!twofaPassword) {
+      setError("Please enter your password first")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    setSuccessMessage("")
+
+    try {
+      const token = localStorage.getItem("token")
+
+      const response = await fetch("http://localhost:8080/api/user/2fa/send-disable-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ password: twofaPassword })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setDisableCodeSent(true)
+        setSuccessMessage(`Verification code sent to your ${user?.twofaMethod === "email" ? "email" : "phone"}`)
+      } else {
+        setError(data.message || "Failed to send verification code")
+      }
+    } catch (err) {
+      console.error("Send disable code error:", err)
       setError("Unable to connect to server")
     } finally {
       setLoading(false)
@@ -1028,61 +1068,114 @@ export function ProfileTab() {
               </div>
             )}
 
-            <p className="mb-4 text-sm text-muted-foreground">
-              To disable Two-Factor Authentication, please enter your password and current 2FA code.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="disable-password">Password</Label>
-                <Input
-                  id="disable-password"
-                  type="password"
-                  value={twofaPassword}
-                  onChange={(e) => setTwofaPassword(e.target.value)}
-                  placeholder="Enter your password"
-                />
+            {successMessage && (
+              <div className="mb-4 rounded-lg bg-green-500/10 p-3 text-sm text-green-600">
+                {successMessage}
               </div>
+            )}
 
-              <div>
-                <Label htmlFor="disable-code">2FA Code</Label>
-                <Input
-                  id="disable-code"
-                  type="text"
-                  value={twofaCode}
-                  onChange={(e) => setTwofaCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Check your {user?.twofaMethod === "email" ? "email" : "phone"} for the code
+            {!disableCodeSent ? (
+              // Step 1: Enter password and send code
+              <>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  To disable Two-Factor Authentication, we need to verify your identity. First, enter your password to receive a verification code.
                 </p>
-              </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleDisable2FA}
-                  disabled={loading}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  {loading ? "Disabling..." : "Disable 2FA"}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowDisableForm(false)
-                    setError("")
-                    setTwofaPassword("")
-                    setTwofaCode("")
-                  }}
-                  disabled={loading}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="disable-password">Password</Label>
+                    <Input
+                      id="disable-password"
+                      type="password"
+                      value={twofaPassword}
+                      onChange={(e) => setTwofaPassword(e.target.value)}
+                      placeholder="Enter your password"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSendDisableCode}
+                      disabled={loading || !twofaPassword}
+                      className="flex-1 bg-primary text-primary-foreground"
+                    >
+                      {loading ? "Sending..." : "Send Verification Code"}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowDisableForm(false)
+                        setError("")
+                        setSuccessMessage("")
+                        setTwofaPassword("")
+                        setTwofaCode("")
+                        setDisableCodeSent(false)
+                      }}
+                      disabled={loading}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Step 2: Enter verification code and disable
+              <>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  A verification code has been sent to your {user?.twofaMethod === "email" ? "email" : "phone"}. Enter the code below to disable 2FA.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="disable-code">Verification Code</Label>
+                    <Input
+                      id="disable-code"
+                      type="text"
+                      value={twofaCode}
+                      onChange={(e) => setTwofaCode(e.target.value)}
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleDisable2FA}
+                      disabled={loading || !twofaCode}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      {loading ? "Disabling..." : "Disable 2FA"}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowDisableForm(false)
+                        setError("")
+                        setSuccessMessage("")
+                        setTwofaPassword("")
+                        setTwofaCode("")
+                        setDisableCodeSent(false)
+                      }}
+                      disabled={loading}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+
+                  <Button
+                    onClick={handleSendDisableCode}
+                    disabled={loading}
+                    variant="ghost"
+                    className="w-full text-sm"
+                  >
+                    Resend Code
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -390,11 +390,11 @@ const toggle2FA = async (req, res) => {
       }
 
       // Verify 2FA code
-      const codeValid = verifyCode(userId, code);
-      if (!codeValid) {
+      const codeVerification = verifyCode(userId, code, 'disable_2fa');
+      if (!codeVerification.valid) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid or expired 2FA code'
+          message: codeVerification.message || 'Invalid or expired 2FA code'
         });
       }
 
@@ -416,6 +416,68 @@ const toggle2FA = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating 2FA settings'
+    });
+  }
+};
+
+/**
+ * SEND DISABLE CODE
+ * Send 2FA verification code for disabling 2FA (requires password verification first)
+ */
+const sendDisableCode = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required'
+      });
+    }
+
+    // Get user
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password'
+      });
+    }
+
+    // Generate and send 2FA code
+    const code = generateCode();
+    storeCode(userId, code, 'disable_2fa');
+
+    // Send code based on user's 2FA method
+    if (user.twofa_method === 'email') {
+      await sendEmailCode(user.email, code);
+    } else if (user.twofa_method === 'phone') {
+      await sendSMSCode(user.phone_number, code);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Verification code sent to your ${user.twofa_method}`
+    });
+
+    console.log(`✅ Sent disable 2FA code to user ${userId}`);
+
+  } catch (error) {
+    console.error('❌ Send disable code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending verification code'
     });
   }
 };
@@ -650,6 +712,7 @@ module.exports = {
   terminateAccount,
   changePhoneNumber,
   toggle2FA,
+  sendDisableCode,
   update2FAMethod,
   send2FATest,
   lookupRecipient
