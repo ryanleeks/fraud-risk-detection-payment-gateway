@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy shared dependencies first
-COPY services/shared /app/shared
+COPY services/shared /shared
 
 # Copy service package files
 COPY services/auth-service/package*.json ./

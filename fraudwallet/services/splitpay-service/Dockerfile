@@ -1,6 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY services/shared /app/shared
+COPY services/shared /shared
 COPY services/splitpay-service/package*.json ./
 RUN npm ci --only=production
 COPY services/splitpay-service/src ./src
