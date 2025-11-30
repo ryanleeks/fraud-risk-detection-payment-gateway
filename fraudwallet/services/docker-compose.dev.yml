@@ -53,7 +53,7 @@ services:
       - "3001:3001"
     volumes:
       - ./auth-service/src:/app/src
-      - ./shared:/app/shared
+      - ./shared:/shared
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +78,7 @@ services:
       - "3002:3002"
     volumes:
       - ./user-service/src:/app/src
-      - ./shared:/app/shared
+      - ./shared:/shared
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,7 +106,7 @@ services:
       - "3003:3003"
     volumes:
       - ./wallet-service/src:/app/src
-      - ./shared:/app/shared
+      - ./shared:/shared
     depends_on:
       - postgres
       - fraud-detection-service
@@ -132,7 +132,7 @@ services:
       - "3004:3004"
     volumes:
       - ./splitpay-service/src:/app/src
-      - ./shared:/app/shared
+      - ./shared:/shared
     depends_on:
       - postgres
       - wallet-service
@@ -157,7 +157,7 @@ services:
       - "3005:3005"
     volumes:
       - ./fraud-detection-service/src:/app/src
-      - ./shared:/app/shared
+      - ./shared:/shared
     depends_on:
       - postgres
     networks:
