@@ -1,6 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY services/shared /app/shared
+COPY services/shared /shared
 COPY services/fraud-detection-service/package*.json ./
 RUN npm install
 COPY services/fraud-detection-service/src ./src
