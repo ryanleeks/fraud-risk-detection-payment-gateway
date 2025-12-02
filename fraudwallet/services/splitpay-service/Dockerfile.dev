@@ -1,9 +1,24 @@
 FROM node:20-alpine
+
 WORKDIR /app
+
+# Install shared dependencies first
+COPY services/shared/package*.json /shared/
+RUN cd /shared && npm install
+
+# Copy rest of shared modules
 COPY services/shared /shared
+
+# Copy and install service dependencies
 COPY services/splitpay-service/package*.json ./
 RUN npm install
+
+# Copy source code
 COPY services/splitpay-service/src ./src
 COPY services/splitpay-service/.env.example ./.env
+
+# Expose port
 EXPOSE 3004
+
+# Start with nodemon for hot reload
 CMD ["npm", "run", "dev"]
