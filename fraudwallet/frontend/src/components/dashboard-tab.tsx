@@ -149,7 +149,7 @@ export function DashboardTab() {
       })
       const transactionsData = await transactionsResponse.json()
       if (transactionsData.success) {
-        setTransactions(transactionsData.transactions)
+        setTransactions(transactionsData.transactions || [])
       }
     } catch (err) {
       console.error("Load wallet data error:", err)
@@ -340,7 +340,7 @@ export function DashboardTab() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-semibold">Recent Transactions</h3>
         </div>
-        {transactions.length === 0 ? (
+        {(transactions || []).length === 0 ? (
           <Card className="p-6 text-center text-muted-foreground">
             <Wallet className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No transactions yet</p>
@@ -348,7 +348,7 @@ export function DashboardTab() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {transactions.map((transaction) => (
+            {(transactions || []).map((transaction) => (
               <Card key={transaction.id} className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div
