@@ -42,9 +42,17 @@ export default function SignupPage() {
       return
     }
 
-    // Check password length
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters")
+    // Validate password requirements (match backend validation)
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters")
+      return
+    }
+    if (!/[A-Z]/.test(formData.password)) {
+      setError("Password must contain at least one uppercase letter")
+      return
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      setError("Password must contain at least one number")
       return
     }
 
@@ -208,6 +216,9 @@ export default function SignupPage() {
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Must be 8+ characters with uppercase and number
+                  </p>
                 </div>
 
                 <div className="space-y-2">
