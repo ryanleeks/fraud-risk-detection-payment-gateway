@@ -36,7 +36,7 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          emailOrPhone,
+          identifier: emailOrPhone,
           password,
         }),
       })
