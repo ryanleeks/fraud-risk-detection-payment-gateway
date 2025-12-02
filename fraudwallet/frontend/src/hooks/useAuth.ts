@@ -18,8 +18,11 @@ export function useAuth() {
     const token = localStorage.getItem("token")
     const storedUser = localStorage.getItem("user")
 
-    if (!token || !storedUser) {
-      // Not logged in - redirect to login
+    // Check for missing, null, or invalid string values
+    if (!token || !storedUser || storedUser === "undefined" || storedUser === "null" || storedUser.trim() === "") {
+      // Not logged in or invalid data - clear and redirect to login
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
       router.push("/login")
       setIsLoading(false)
       return
@@ -27,10 +30,15 @@ export function useAuth() {
 
     try {
       const userData = JSON.parse(storedUser)
+      // Validate that parsed data is a proper object with expected properties
+      if (!userData || typeof userData !== 'object' || userData === null) {
+        throw new Error('Invalid user data: not an object')
+      }
       setUser(userData)
       setIsAuthenticated(true)
     } catch (error) {
       console.error("Error parsing user data:", error)
+      console.error("Stored user value was:", storedUser)
       // Invalid data - clear and redirect to login
       localStorage.removeItem("token")
       localStorage.removeItem("user")

@@ -45,18 +45,26 @@ export default function LoginPage() {
 
       if (data.success) {
         // Check if 2FA is required
-        if (data.requiresTwoFA) {
+        if (data.data?.requires2FA || data.requires2FA) {
           // Show 2FA modal
-          setTwoFAUserId(data.userId)
-          setTwoFAMethod(data.message)
+          setTwoFAUserId(data.data?.userId || data.userId)
+          setTwoFAMethod(data.data?.method || data.method || "2FA code sent to your email")
           setShowTwoFAModal(true)
         } else {
           // Normal login - save token and redirect
-          localStorage.setItem("token", data.token)
-          localStorage.setItem("user", JSON.stringify(data.user))
+          const token = data.data?.token || data.token
+          const user = data.data?.user || data.user
 
-          alert("Login successful! Welcome back!")
-          router.push("/")
+          // Validate that both token and user exist and user is a valid object
+          if (token && user && typeof user === 'object' && user !== null) {
+            localStorage.setItem("token", token)
+            localStorage.setItem("user", JSON.stringify(user))
+            alert("Login successful! Welcome back!")
+            router.push("/")
+          } else {
+            setError("Invalid response from server. Please try again.")
+            console.error("Missing token or user in response:", data)
+          }
         }
       } else {
         setError(data.message || "Failed to login")
@@ -90,11 +98,19 @@ export default function LoginPage() {
 
       if (data.success) {
         // Save token and redirect
-        localStorage.setItem("token", data.token)
-        localStorage.setItem("user", JSON.stringify(data.user))
+        const token = data.data?.token || data.token
+        const user = data.data?.user || data.user
 
-        alert("Login successful! Welcome back!")
-        router.push("/")
+        // Validate that both token and user exist and user is a valid object
+        if (token && user && typeof user === 'object' && user !== null) {
+          localStorage.setItem("token", token)
+          localStorage.setItem("user", JSON.stringify(user))
+          alert("Login successful! Welcome back!")
+          router.push("/")
+        } else {
+          setError("Invalid response from server. Please try again.")
+          console.error("Missing token or user in 2FA response:", data)
+        }
       } else {
         setError(data.message || "Invalid verification code")
       }
