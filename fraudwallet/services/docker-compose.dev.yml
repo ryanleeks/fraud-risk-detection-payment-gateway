@@ -54,6 +54,7 @@ services:
     volumes:
       - ./auth-service/src:/app/src
       - ./shared:/shared
+      - /shared/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,6 +80,7 @@ services:
     volumes:
       - ./user-service/src:/app/src
       - ./shared:/shared
+      - /shared/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +109,7 @@ services:
     volumes:
       - ./wallet-service/src:/app/src
       - ./shared:/shared
+      - /shared/node_modules
     depends_on:
       - postgres
       - fraud-detection-service
@@ -133,6 +136,7 @@ services:
     volumes:
       - ./splitpay-service/src:/app/src
       - ./shared:/shared
+      - /shared/node_modules
     depends_on:
       - postgres
       - wallet-service
@@ -158,6 +162,7 @@ services:
     volumes:
       - ./fraud-detection-service/src:/app/src
       - ./shared:/shared
+      - /shared/node_modules
     depends_on:
       - postgres
     networks:
