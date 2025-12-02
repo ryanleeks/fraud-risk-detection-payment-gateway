@@ -57,7 +57,7 @@ exports.getBalance = async (req, res) => {
     }
 
     return ResponseHandler.success(res, {
-      balance: parseFloat(result.rows[0].wallet_balance)
+      balance: parseFloat(result.rows[0].wallet_balance) || 0
     }, 'Balance retrieved successfully');
 
   } catch (error) {

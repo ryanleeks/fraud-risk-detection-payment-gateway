@@ -129,13 +129,13 @@ export function DashboardTab() {
       })
       const balanceData = await balanceResponse.json()
       if (balanceData.success) {
-        setWalletBalance(balanceData.balance)
+        setWalletBalance(balanceData.balance ?? 0)
 
         // Update user data in localStorage
         const storedUser = localStorage.getItem("user")
         if (storedUser) {
           const userData = JSON.parse(storedUser)
-          userData.walletBalance = balanceData.balance
+          userData.walletBalance = balanceData.balance ?? 0
           localStorage.setItem("user", JSON.stringify(userData))
           setUser(userData)
         }
@@ -295,7 +295,7 @@ export function DashboardTab() {
       <Card className="relative overflow-hidden bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground">
         <div className="relative z-10">
           <p className="text-sm opacity-90">Wallet Balance</p>
-          <h2 className="mt-2 text-4xl font-bold">RM {walletBalance.toFixed(2)}</h2>
+          <h2 className="mt-2 text-4xl font-bold">RM {(walletBalance ?? 0).toFixed(2)}</h2>
           <div className="mt-4">
             <Button
               onClick={() => setShowAddFundsModal(true)}
