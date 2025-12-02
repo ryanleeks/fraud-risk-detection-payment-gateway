@@ -55,7 +55,8 @@ export default function LoginPage() {
           const token = data.data?.token || data.token
           const user = data.data?.user || data.user
 
-          if (token && user) {
+          // Validate that both token and user exist and user is a valid object
+          if (token && user && typeof user === 'object' && user !== null) {
             localStorage.setItem("token", token)
             localStorage.setItem("user", JSON.stringify(user))
             alert("Login successful! Welcome back!")
@@ -100,7 +101,8 @@ export default function LoginPage() {
         const token = data.data?.token || data.token
         const user = data.data?.user || data.user
 
-        if (token && user) {
+        // Validate that both token and user exist and user is a valid object
+        if (token && user && typeof user === 'object' && user !== null) {
           localStorage.setItem("token", token)
           localStorage.setItem("user", JSON.stringify(user))
           alert("Login successful! Welcome back!")
