@@ -37,10 +37,13 @@ export function SplitPayTab() {
       const data = await response.json()
 
       if (data.success) {
-        setMySplits(data.splits)
+        setMySplits(data.splits || [])
+      } else {
+        setMySplits([])
       }
     } catch (err) {
       console.error("Load splits error:", err)
+      setMySplits([])
     }
   }
 

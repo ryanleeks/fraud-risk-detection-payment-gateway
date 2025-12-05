@@ -57,35 +57,54 @@ export function FraudDashboardTab() {
 
       // Fetch system metrics
       const metricsResponse = await fetch("http://localhost:8080/api/fraud/system-metrics", { headers })
-      const metricsData = await metricsResponse.json()
-      if (metricsData.success) {
-        setSystemMetrics(metricsData.metrics)
+      if (metricsResponse.ok) {
+        const metricsData = await metricsResponse.json()
+        if (metricsData.success) {
+          setSystemMetrics(metricsData.metrics)
+        }
+      } else {
+        console.error("Failed to fetch system metrics:", metricsResponse.status)
       }
 
       // Fetch high-risk users
       const highRiskResponse = await fetch("http://localhost:8080/api/fraud/high-risk-users?limit=10&minScore=60", { headers })
-      const highRiskData = await highRiskResponse.json()
-      if (highRiskData.success && highRiskData.users) {
-        setHighRiskUsers(highRiskData.users)
+      if (highRiskResponse.ok) {
+        const highRiskData = await highRiskResponse.json()
+        if (highRiskData.success && highRiskData.users) {
+          setHighRiskUsers(highRiskData.users)
+        } else {
+          setHighRiskUsers([])
+        }
       } else {
+        console.error("Failed to fetch high-risk users:", highRiskResponse.status)
         setHighRiskUsers([])
       }
 
       // Fetch top flagged users
       const flaggedResponse = await fetch("http://localhost:8080/api/fraud/top-flagged-users?limit=10&days=7", { headers })
-      const flaggedData = await flaggedResponse.json()
-      if (flaggedData.success && flaggedData.users) {
-        setTopFlaggedUsers(flaggedData.users)
+      if (flaggedResponse.ok) {
+        const flaggedData = await flaggedResponse.json()
+        if (flaggedData.success && flaggedData.users) {
+          setTopFlaggedUsers(flaggedData.users)
+        } else {
+          setTopFlaggedUsers([])
+        }
       } else {
+        console.error("Failed to fetch top flagged users:", flaggedResponse.status)
         setTopFlaggedUsers([])
       }
 
       // Fetch recent logs
       const logsResponse = await fetch("http://localhost:8080/api/fraud/recent-logs?limit=20", { headers })
-      const logsData = await logsResponse.json()
-      if (logsData.success && logsData.logs) {
-        setRecentLogs(logsData.logs)
+      if (logsResponse.ok) {
+        const logsData = await logsResponse.json()
+        if (logsData.success && logsData.logs) {
+          setRecentLogs(logsData.logs)
+        } else {
+          setRecentLogs([])
+        }
       } else {
+        console.error("Failed to fetch recent logs:", logsResponse.status)
         setRecentLogs([])
       }
     } catch (err) {
