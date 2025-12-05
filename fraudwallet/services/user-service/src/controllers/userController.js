@@ -158,7 +158,8 @@ exports.send2FATest = async (req, res) => {
  * Lookup recipient for payment
  */
 exports.lookupRecipient = [
-  body('identifier').trim().notEmpty().withMessage('Email, phone, or Account ID is required'),
+  body('identifier').optional().trim().notEmpty().withMessage('Email, phone, or Account ID is required'),
+  body('query').optional().trim().notEmpty().withMessage('Email, phone, or Account ID is required'),
 
   async (req, res) => {
     try {
@@ -167,7 +168,13 @@ exports.lookupRecipient = [
         return ResponseHandler.validationError(res, errors.array());
       }
 
-      const { identifier } = req.body;
+      // Accept both 'identifier' and 'query' parameters for compatibility
+      const { identifier, query } = req.body;
+      const searchTerm = identifier || query;
+
+      if (!searchTerm) {
+        return ResponseHandler.error(res, 'Email, phone, or Account ID is required', 400);
+      }
 
       // Search by email, phone, or account ID
       const result = await database.query(
@@ -175,7 +182,7 @@ exports.lookupRecipient = [
          FROM users
          WHERE (email = $1 OR phone_number = $1 OR account_id = $1)
          AND account_status = 'active'`,
-        [identifier]
+        [searchTerm]
       );
 
       if (result.rows.length === 0) {
@@ -184,14 +191,16 @@ exports.lookupRecipient = [
 
       const recipient = result.rows[0];
 
-      logger.info('Recipient lookup', { searchTerm: identifier, foundUserId: recipient.id });
+      logger.info('Recipient lookup', { searchTerm, foundUserId: recipient.id });
 
       return ResponseHandler.success(res, {
-        id: recipient.id,
-        accountId: recipient.account_id,
-        fullName: recipient.full_name,
-        email: recipient.email,
-        phoneNumber: recipient.phone_number
+        recipient: {
+          id: recipient.id,
+          accountId: recipient.account_id,
+          fullName: recipient.full_name,
+          email: recipient.email,
+          phoneNumber: recipient.phone_number
+        }
       }, 'Recipient found');
 
     } catch (error) {
