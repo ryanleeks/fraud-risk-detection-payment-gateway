@@ -189,6 +189,43 @@ exports.getHighRiskUsers = async (req, res) => {
 };
 
 /**
+ * Get top flagged users
+ */
+exports.getTopFlaggedUsers = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const days = parseInt(req.query.days) || 7;
+
+    const result = await database.query(
+      `SELECT
+        fl.user_id,
+        u.full_name,
+        u.account_id,
+        COUNT(*) as total_flags,
+        AVG(fl.risk_score) as avg_risk_score,
+        MAX(fl.risk_score) as max_risk_score,
+        COUNT(CASE WHEN fl.action_taken = 'blocked' THEN 1 END) as blocked_count,
+        COUNT(CASE WHEN fl.action_taken = 'review' THEN 1 END) as review_count,
+        MAX(fl.created_at) as last_flagged
+       FROM fraud_logs fl
+       JOIN users u ON fl.user_id = u.id
+       WHERE fl.created_at > NOW() - INTERVAL '${days} days'
+       GROUP BY fl.user_id, u.full_name, u.account_id
+       HAVING COUNT(*) > 0
+       ORDER BY total_flags DESC, avg_risk_score DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    return ResponseHandler.success(res, { users: result.rows });
+
+  } catch (error) {
+    logger.error('Get top flagged users error', error);
+    return ResponseHandler.serverError(res, error);
+  }
+};
+
+/**
  * Get detailed fraud info for a user
  */
 exports.getUserFraudDetails = async (req, res) => {

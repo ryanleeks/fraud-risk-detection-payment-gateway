@@ -30,6 +30,7 @@ app.get('/api/fraud/user-stats', verifyToken, fraudController.getUserStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudController.getSystemMetrics);
 app.get('/api/fraud/recent-logs', verifyToken, fraudController.getRecentLogs);
 app.get('/api/fraud/high-risk-users', verifyToken, fraudController.getHighRiskUsers);
+app.get('/api/fraud/top-flagged-users', verifyToken, fraudController.getTopFlaggedUsers);
 app.get('/api/fraud/user/:userId', verifyToken, fraudController.getUserFraudDetails);
 
 app.use((err, req, res, next) => {

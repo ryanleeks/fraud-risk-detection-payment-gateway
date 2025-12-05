@@ -38,6 +38,7 @@ app.post('/api/user/2fa/test', verifyToken, userController.send2FATest);
 
 // Payment lookup routes (protected)
 app.post('/api/user/lookup-recipient', verifyToken, userController.lookupRecipient);
+app.post('/api/payment/lookup-recipient', verifyToken, userController.lookupRecipient);
 
 // QR Code generation
 app.get('/api/user/qrcode', verifyToken, userController.generateQRCode);
