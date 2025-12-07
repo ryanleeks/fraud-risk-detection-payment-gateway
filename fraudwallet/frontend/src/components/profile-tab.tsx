@@ -271,7 +271,7 @@ export function ProfileTab() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ enabled: true })
+        body: JSON.stringify({ enable: true })
       })
 
       const data = await response.json()
@@ -308,7 +308,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/send-disable-code", {
+      const response = await fetch("http://localhost:8080/api/auth/2fa/send-disable-code", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -359,9 +359,8 @@ export function ProfileTab() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          enabled: false,
-          password: twofaPassword,
-          code: twofaCode
+          enable: false,
+          otpCode: twofaCode
         })
       })
 
