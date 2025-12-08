@@ -94,8 +94,8 @@ echo ""
 echo "🔐 AUTHENTICATION TESTS"
 echo "------------------------"
 
-# Try to login with existing test account (alice from seed data)
-LOGIN_DATA='{"identifier":"alice@example.com","password":"password123"}'
+# Try to login with existing test account (john from seed data)
+LOGIN_DATA='{"identifier":"john@test.com","password":"Test1234!"}'
 LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "$LOGIN_DATA")
@@ -103,13 +103,13 @@ LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
 TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*' | sed 's/"token":"//')
 
 if [ ! -z "$TOKEN" ]; then
-    echo -e "${GREEN}✅ Login successful${NC} (Token obtained for alice@example.com)"
+    echo -e "${GREEN}✅ Login successful${NC} (Token obtained for john@test.com)"
     ((PASS++))
 else
     echo -e "${YELLOW}⚠️  Could not login with test account${NC}"
-    echo "   Trying bob@example.com..."
+    echo "   Trying jane@test.com..."
 
-    LOGIN_DATA='{"identifier":"bob@example.com","password":"password123"}'
+    LOGIN_DATA='{"identifier":"jane@test.com","password":"Test1234!"}'
     LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
         -H "Content-Type: application/json" \
         -d "$LOGIN_DATA")
@@ -117,7 +117,7 @@ else
     TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*' | sed 's/"token":"//')
 
     if [ ! -z "$TOKEN" ]; then
-        echo -e "${GREEN}✅ Login successful${NC} (Token obtained for bob@example.com)"
+        echo -e "${GREEN}✅ Login successful${NC} (Token obtained for jane@test.com)"
         ((PASS++))
     fi
 fi
