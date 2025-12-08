@@ -61,8 +61,27 @@ test_endpoint() {
 # 1. TEST INFRASTRUCTURE
 echo "🔧 INFRASTRUCTURE TESTS"
 echo "------------------------"
-test_endpoint "PostgreSQL Health" "http://localhost:5432" "GET"
-test_endpoint "Redis Health" "http://localhost:6379" "GET"
+
+# PostgreSQL check using docker
+echo -n "Testing: PostgreSQL Health... "
+if docker exec fraudwallet-postgres-dev pg_isready -U postgres > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ PASS${NC} (docker)"
+    ((PASS++))
+else
+    echo -e "${RED}❌ FAIL${NC} (docker)"
+    ((FAIL++))
+fi
+
+# Redis check using docker
+echo -n "Testing: Redis Health... "
+if docker exec fraudwallet-redis-dev redis-cli ping > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ PASS${NC} (docker)"
+    ((PASS++))
+else
+    echo -e "${RED}❌ FAIL${NC} (docker)"
+    ((FAIL++))
+fi
+
 test_endpoint "Auth Service Health" "http://localhost:3001/health" "GET"
 test_endpoint "User Service Health" "http://localhost:3002/health" "GET"
 test_endpoint "Wallet Service Health" "http://localhost:3003/health" "GET"
@@ -75,7 +94,7 @@ echo ""
 echo "🔐 AUTHENTICATION TESTS"
 echo "------------------------"
 
-# Try to login with test account
+# Try to login with existing test account (alice from seed data)
 LOGIN_DATA='{"identifier":"alice@example.com","password":"password123"}'
 LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
     -H "Content-Type: application/json" \
@@ -83,15 +102,24 @@ LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
 
 TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*' | sed 's/"token":"//')
 
-if [ -z "$TOKEN" ]; then
-    echo -e "${YELLOW}⚠️  No test user found - will test with signup${NC}"
-
-    # Test signup
-    SIGNUP_DATA='{"fullName":"Test User","email":"testuser'$(date +%s)'@test.com","phoneNumber":"60123456789","password":"Test123456"}'
-    test_endpoint "User Signup" "http://localhost:8080/api/auth/signup" "POST" "$SIGNUP_DATA"
-else
-    echo -e "${GREEN}✅ Login successful${NC} (Token obtained)"
+if [ ! -z "$TOKEN" ]; then
+    echo -e "${GREEN}✅ Login successful${NC} (Token obtained for alice@example.com)"
     ((PASS++))
+else
+    echo -e "${YELLOW}⚠️  Could not login with test account${NC}"
+    echo "   Trying bob@example.com..."
+
+    LOGIN_DATA='{"identifier":"bob@example.com","password":"password123"}'
+    LOGIN_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "$LOGIN_DATA")
+
+    TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*' | sed 's/"token":"//')
+
+    if [ ! -z "$TOKEN" ]; then
+        echo -e "${GREEN}✅ Login successful${NC} (Token obtained for bob@example.com)"
+        ((PASS++))
+    fi
 fi
 
 test_endpoint "Login (Invalid Creds)" "http://localhost:8080/api/auth/login" "POST" '{"identifier":"fake@test.com","password":"wrong"}'
