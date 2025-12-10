@@ -81,6 +81,11 @@ app.get('/api/fraud/high-risk-users', verifyToken, fraudAPI.getHighRiskUsers);
 app.get('/api/fraud/top-flagged-users', verifyToken, fraudAPI.getTopFlaggedUsers);
 app.get('/api/fraud/user/:userId', verifyToken, fraudAPI.getUserFraudDetails);
 
+// AI-Enhanced Fraud Detection routes (new)
+app.get('/api/fraud/ai-logs', verifyToken, fraudAPI.getAIFraudLogs);
+app.get('/api/fraud/ai-metrics', verifyToken, fraudAPI.getAIMetrics);
+app.get('/api/fraud/ai-disagreements', verifyToken, fraudAPI.getDisagreementCases);
+
 // Start the server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
