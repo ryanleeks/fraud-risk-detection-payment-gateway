@@ -338,11 +338,17 @@ const sendMoney = async (req, res) => {
         fraudDetection: {
           riskScore: fraudCheck.riskScore,
           riskLevel: fraudCheck.riskLevel,
-          reason: 'Multiple fraud indicators detected',
+          reason: fraudCheck.aiAnalysis?.reasoning || 'Multiple fraud indicators detected',
+          detectionMethod: fraudCheck.detectionMethod,
           triggeredRules: fraudCheck.triggeredRules.map(r => ({
             name: r.ruleName,
             description: r.description
-          }))
+          })),
+          aiInsights: fraudCheck.aiAnalysis ? {
+            score: fraudCheck.aiAnalysis.riskScore,
+            confidence: fraudCheck.aiAnalysis.confidence,
+            redFlags: fraudCheck.aiAnalysis.redFlags
+          } : null
         }
       });
     }

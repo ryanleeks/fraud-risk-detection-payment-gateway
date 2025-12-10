@@ -242,11 +242,163 @@ const getUserFraudDetails = async (req, res) => {
   }
 };
 
+/**
+ * Get AI-enhanced fraud logs with AI analysis
+ */
+const getAIFraudLogs = async (req, res) => {
+  try {
+    const { limit = 20, minScore = 0 } = req.query;
+
+    const logs = db.prepare(`
+      SELECT
+        fl.*,
+        u.full_name,
+        u.account_id
+      FROM fraud_logs fl
+      JOIN users u ON fl.user_id = u.id
+      WHERE fl.detection_method = 'hybrid'
+      AND fl.risk_score >= ?
+      ORDER BY fl.created_at DESC
+      LIMIT ?
+    `).all(parseInt(minScore), parseInt(limit));
+
+    const parsedLogs = logs.map(log => ({
+      ...log,
+      rules_triggered: log.rules_triggered ? JSON.parse(log.rules_triggered) : [],
+      ai_red_flags: log.ai_red_flags ? JSON.parse(log.ai_red_flags) : []
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: parsedLogs.length,
+      logs: parsedLogs
+    });
+  } catch (error) {
+    console.error('Get AI fraud logs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching AI fraud logs'
+    });
+  }
+};
+
+/**
+ * Get AI detection metrics and performance
+ */
+const getAIMetrics = async (req, res) => {
+  try {
+    // Overall AI usage
+    const aiUsage = db.prepare(`
+      SELECT
+        COUNT(*) as total_ai_checks,
+        AVG(ai_risk_score) as avg_ai_score,
+        AVG(ai_confidence) as avg_confidence,
+        AVG(ai_response_time) as avg_response_time,
+        COUNT(CASE WHEN detection_method = 'hybrid' THEN 1 END) as hybrid_count,
+        COUNT(CASE WHEN detection_method = 'rules' THEN 1 END) as rules_only_count
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-24 hours')
+    `).get();
+
+    // AI vs Rules comparison
+    const comparison = db.prepare(`
+      SELECT
+        AVG(CASE WHEN detection_method = 'hybrid' THEN risk_score END) as avg_hybrid_score,
+        AVG(CASE WHEN detection_method = 'rules' THEN risk_score END) as avg_rules_score,
+        AVG(CASE WHEN detection_method = 'hybrid' THEN ABS(rule_based_score - ai_risk_score) END) as avg_score_difference
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-7 days')
+    `).get();
+
+    // AI detection rate
+    const detectionStats = db.prepare(`
+      SELECT
+        detection_method,
+        action_taken,
+        COUNT(*) as count
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-24 hours')
+      GROUP BY detection_method, action_taken
+    `).all();
+
+    res.status(200).json({
+      success: true,
+      metrics: {
+        usage: {
+          totalAIChecks: aiUsage.total_ai_checks || 0,
+          avgAIScore: aiUsage.avg_ai_score ? parseFloat(aiUsage.avg_ai_score.toFixed(2)) : 0,
+          avgConfidence: aiUsage.avg_confidence ? parseFloat(aiUsage.avg_confidence.toFixed(2)) : 0,
+          avgResponseTime: aiUsage.avg_response_time ? parseFloat(aiUsage.avg_response_time.toFixed(2)) : 0,
+          hybridCount: aiUsage.hybrid_count || 0,
+          rulesOnlyCount: aiUsage.rules_only_count || 0
+        },
+        comparison: {
+          avgHybridScore: comparison.avg_hybrid_score ? parseFloat(comparison.avg_hybrid_score.toFixed(2)) : 0,
+          avgRulesScore: comparison.avg_rules_score ? parseFloat(comparison.avg_rules_score.toFixed(2)) : 0,
+          avgScoreDifference: comparison.avg_score_difference ? parseFloat(comparison.avg_score_difference.toFixed(2)) : 0
+        },
+        detectionStats: detectionStats
+      }
+    });
+  } catch (error) {
+    console.error('Get AI metrics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching AI metrics'
+    });
+  }
+};
+
+/**
+ * Get cases where AI and rules disagreed
+ */
+const getDisagreementCases = async (req, res) => {
+  try {
+    const { threshold = 30, limit = 20 } = req.query;
+
+    const disagreements = db.prepare(`
+      SELECT
+        fl.*,
+        u.full_name,
+        u.account_id,
+        ABS(fl.rule_based_score - fl.ai_risk_score) as score_difference
+      FROM fraud_logs fl
+      JOIN users u ON fl.user_id = u.id
+      WHERE fl.detection_method = 'hybrid'
+      AND ABS(fl.rule_based_score - fl.ai_risk_score) >= ?
+      ORDER BY score_difference DESC
+      LIMIT ?
+    `).all(parseInt(threshold), parseInt(limit));
+
+    const parsedDisagreements = disagreements.map(log => ({
+      ...log,
+      rules_triggered: log.rules_triggered ? JSON.parse(log.rules_triggered) : [],
+      ai_red_flags: log.ai_red_flags ? JSON.parse(log.ai_red_flags) : []
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: parsedDisagreements.length,
+      disagreements: parsedDisagreements
+    });
+  } catch (error) {
+    console.error('Get disagreement cases error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching disagreement cases'
+    });
+  }
+};
+
 module.exports = {
   getUserFraudStats,
   getSystemMetrics,
   getRecentFraudLogs,
   getHighRiskUsers,
   getTopFlaggedUsers,
-  getUserFraudDetails
+  getUserFraudDetails,
+  // New AI endpoints
+  getAIFraudLogs,
+  getAIMetrics,
+  getDisagreementCases
 };
