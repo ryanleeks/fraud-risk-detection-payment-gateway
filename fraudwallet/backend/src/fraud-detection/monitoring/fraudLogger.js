@@ -13,7 +13,11 @@ const logFraudCheck = async (transaction, fraudResult) => {
     // Create fraud_logs table if it doesn't exist
     createFraudLogsTable();
 
-    // Insert fraud check log
+    // Extract AI data if available
+    const aiAnalysis = fraudResult.aiAnalysis || {};
+    const ruleAnalysis = fraudResult.ruleBasedAnalysis || {};
+
+    // Insert fraud check log with AI data
     db.prepare(`
       INSERT INTO fraud_logs (
         user_id,
@@ -24,8 +28,15 @@ const logFraudCheck = async (transaction, fraudResult) => {
         action_taken,
         rules_triggered,
         execution_time_ms,
+        rule_based_score,
+        ai_risk_score,
+        ai_confidence,
+        ai_reasoning,
+        ai_red_flags,
+        ai_response_time,
+        detection_method,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       transaction.userId,
       transaction.type,
@@ -33,8 +44,15 @@ const logFraudCheck = async (transaction, fraudResult) => {
       fraudResult.riskScore,
       fraudResult.riskLevel,
       fraudResult.action,
-      JSON.stringify(fraudResult.triggeredRules.map(r => r.ruleId)),
-      fraudResult.executionTime
+      JSON.stringify((fraudResult.triggeredRules || ruleAnalysis.triggeredRules || []).map(r => r.ruleId || r)),
+      fraudResult.executionTime,
+      ruleAnalysis.score || fraudResult.riskScore,
+      aiAnalysis.riskScore || null,
+      aiAnalysis.confidence || null,
+      aiAnalysis.reasoning || null,
+      JSON.stringify(aiAnalysis.redFlags || []),
+      aiAnalysis.responseTime || null,
+      fraudResult.detectionMethod || 'rules'
     );
 
     // Log to console for real-time monitoring
@@ -44,9 +62,17 @@ const logFraudCheck = async (transaction, fraudResult) => {
       console.log(`   Amount: RM${transaction.amount.toFixed(2)}`);
       console.log(`   Risk Score: ${fraudResult.riskScore}/100 (${fraudResult.riskLevel})`);
       console.log(`   Action: ${fraudResult.action}`);
-      console.log(`   Rules: ${fraudResult.triggeredRules.map(r => r.ruleId).join(', ')}`);
+      console.log(`   Detection: ${fraudResult.detectionMethod || 'rules'}`);
+
+      if (ruleAnalysis.triggeredRules) {
+        console.log(`   Rules: ${ruleAnalysis.triggeredRules.map(r => r.ruleId || r).join(', ')}`);
+      }
+
+      if (aiAnalysis.reasoning) {
+        console.log(`   AI Analysis: ${aiAnalysis.reasoning}`);
+      }
     } else if (fraudResult.riskScore >= 40) {
-      console.log(`⚠️  MEDIUM RISK: User ${transaction.userId}, Score: ${fraudResult.riskScore}/100`);
+      console.log(`⚠️  MEDIUM RISK: User ${transaction.userId}, Score: ${fraudResult.riskScore}/100 (${fraudResult.detectionMethod || 'rules'})`);
     }
 
   } catch (error) {
@@ -185,6 +211,49 @@ const createFraudLogsTable = () => {
       CREATE INDEX IF NOT EXISTS idx_fraud_logs_created_at ON fraud_logs(created_at);
       CREATE INDEX IF NOT EXISTS idx_fraud_logs_risk_score ON fraud_logs(risk_score);
     `);
+
+    // Add AI columns if they don't exist (migration for existing databases)
+    try {
+      const columns = db.prepare("PRAGMA table_info(fraud_logs)").all();
+      const columnNames = columns.map(col => col.name);
+
+      if (!columnNames.includes('rule_based_score')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN rule_based_score INTEGER");
+        console.log('✅ Added rule_based_score column to fraud_logs');
+      }
+
+      if (!columnNames.includes('ai_risk_score')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ai_risk_score INTEGER");
+        console.log('✅ Added ai_risk_score column to fraud_logs');
+      }
+
+      if (!columnNames.includes('ai_confidence')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ai_confidence INTEGER");
+        console.log('✅ Added ai_confidence column to fraud_logs');
+      }
+
+      if (!columnNames.includes('ai_reasoning')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ai_reasoning TEXT");
+        console.log('✅ Added ai_reasoning column to fraud_logs');
+      }
+
+      if (!columnNames.includes('ai_red_flags')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ai_red_flags TEXT");
+        console.log('✅ Added ai_red_flags column to fraud_logs');
+      }
+
+      if (!columnNames.includes('ai_response_time')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ai_response_time INTEGER");
+        console.log('✅ Added ai_response_time column to fraud_logs');
+      }
+
+      if (!columnNames.includes('detection_method')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN detection_method TEXT DEFAULT 'rules'");
+        console.log('✅ Added detection_method column to fraud_logs');
+      }
+    } catch (error) {
+      console.error('Error adding AI columns:', error.message);
+    }
   } catch (error) {
     // Table might already exist, that's okay
   }
