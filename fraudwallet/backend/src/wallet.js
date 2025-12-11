@@ -1,6 +1,19 @@
 // Wallet and Stripe payment management
 const db = require('./database');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// Initialize Stripe with error handling
+let stripe = null;
+try {
+  if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_51PlaceholderKeyForDevelopmentPurposesOnly123456789') {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    console.log('✅ Stripe initialized');
+  } else {
+    console.warn('⚠️  Stripe API key not configured - payment features will be disabled');
+  }
+} catch (error) {
+  console.error('❌ Stripe initialization failed:', error.message);
+}
+
 const fraudDetection = require('./fraud-detection');
 
 // Amount validation constants
