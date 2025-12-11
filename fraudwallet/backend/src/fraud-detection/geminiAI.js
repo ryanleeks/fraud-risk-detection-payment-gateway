@@ -41,7 +41,7 @@ class GeminiFraudDetector {
     });
 
     // Model configuration
-    this.modelName = "gemini-2.0-flash-exp"; // Fast, free model
+    this.modelName = "gemini-2.5-flash"; // Fast, free model
 
     // Rate limiting tracking
     this.requestCount = {
