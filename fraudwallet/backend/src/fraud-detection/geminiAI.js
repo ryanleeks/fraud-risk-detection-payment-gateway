@@ -108,13 +108,21 @@ class GeminiFraudDetector {
       });
 
       // Parse JSON response
-      const analysisText = response.text;
+      let analysisText = response.text;
       let analysis;
+
+      // Strip markdown code blocks if present (```json ... ```)
+      if (analysisText.includes('```json')) {
+        analysisText = analysisText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      } else if (analysisText.includes('```')) {
+        analysisText = analysisText.replace(/```\s*/g, '').trim();
+      }
 
       try {
         analysis = JSON.parse(analysisText);
       } catch (parseError) {
         console.error('Failed to parse AI response as JSON:', analysisText);
+        console.error('Parse error:', parseError.message);
         throw new Error('Invalid JSON response from AI');
       }
 
