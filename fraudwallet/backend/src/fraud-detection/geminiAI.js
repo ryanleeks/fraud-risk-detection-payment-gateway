@@ -1,5 +1,5 @@
 /**
- * GEMINI AI FRAUD DETECTOR
+ * GEMINI AI FRAUD DETECTOR (Updated for @google/genai SDK)
  *
  * This module uses Google's Gemini Pro AI to detect fraud patterns in transactions.
  *
@@ -22,7 +22,7 @@
  * - JSON structured output
  */
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 
 class GeminiFraudDetector {
   constructor() {
@@ -34,19 +34,14 @@ class GeminiFraudDetector {
     }
 
     this.enabled = true;
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-    // Use gemini-2.0-flash-exp - fastest free model
-    this.model = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.1, // Low temperature = more consistent, less creative
-        topK: 1,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-        responseMimeType: "application/json" // Force JSON response
-      }
+    // Initialize with new @google/genai SDK
+    this.ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY
     });
+
+    // Model configuration
+    this.modelName = "gemini-2.0-flash-exp"; // Fast, free model
 
     // Rate limiting tracking
     this.requestCount = {
@@ -85,13 +80,24 @@ class GeminiFraudDetector {
       // Build the fraud analysis prompt
       const prompt = this._buildPrompt(transaction, userProfile, recentTransactions);
 
-      // Call Gemini API
+      // Call Gemini API with new SDK
       console.log('🤖 Calling Gemini AI for fraud analysis...');
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+
+      const response = await this.ai.models.generateContent({
+        model: this.modelName,
+        contents: prompt,
+        config: {
+          temperature: 0.1,  // Low temperature = more consistent
+          topK: 1,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+          responseMimeType: "application/json" // Force JSON response
+        }
+      });
 
       // Parse JSON response
-      const analysis = JSON.parse(response);
+      const analysisText = response.text;
+      const analysis = JSON.parse(analysisText);
 
       // Track response time
       const responseTime = Date.now() - startTime;
