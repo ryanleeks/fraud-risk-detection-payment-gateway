@@ -86,18 +86,37 @@ class GeminiFraudDetector {
       const response = await this.ai.models.generateContent({
         model: this.modelName,
         contents: prompt,
-        config: {
+        generationConfig: {
           temperature: 0.1,  // Low temperature = more consistent
           topK: 1,
           topP: 0.95,
           maxOutputTokens: 1024,
-          responseMimeType: "application/json" // Force JSON response
+          responseMimeType: "application/json", // Force JSON response
+          responseSchema: {
+            type: "object",
+            properties: {
+              riskScore: { type: "integer" },
+              confidence: { type: "integer" },
+              action: { type: "string" },
+              reasoning: { type: "string" },
+              redFlags: { type: "array", items: { type: "string" } },
+              recommendedChecks: { type: "array", items: { type: "string" } }
+            },
+            required: ["riskScore", "confidence", "action", "reasoning"]
+          }
         }
       });
 
       // Parse JSON response
       const analysisText = response.text;
-      const analysis = JSON.parse(analysisText);
+      let analysis;
+
+      try {
+        analysis = JSON.parse(analysisText);
+      } catch (parseError) {
+        console.error('Failed to parse AI response as JSON:', analysisText);
+        throw new Error('Invalid JSON response from AI');
+      }
 
       // Track response time
       const responseTime = Date.now() - startTime;
