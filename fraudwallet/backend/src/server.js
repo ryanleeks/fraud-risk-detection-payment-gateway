@@ -81,10 +81,21 @@ app.get('/api/fraud/high-risk-users', verifyToken, fraudAPI.getHighRiskUsers);
 app.get('/api/fraud/top-flagged-users', verifyToken, fraudAPI.getTopFlaggedUsers);
 app.get('/api/fraud/user/:userId', verifyToken, fraudAPI.getUserFraudDetails);
 
-// AI-Enhanced Fraud Detection routes (new)
+// AI-Enhanced Fraud Detection routes
 app.get('/api/fraud/ai-logs', verifyToken, fraudAPI.getAIFraudLogs);
 app.get('/api/fraud/ai-metrics', verifyToken, fraudAPI.getAIMetrics);
 app.get('/api/fraud/ai-disagreements', verifyToken, fraudAPI.getDisagreementCases);
+
+// Academic Metrics routes (for final year project)
+app.post('/api/fraud/verify/:logId', verifyToken, fraudAPI.verifyGroundTruth);
+app.get('/api/fraud/unverified-logs', verifyToken, fraudAPI.getUnverifiedLogs);
+app.get('/api/fraud/verified-logs', verifyToken, fraudAPI.getVerifiedLogs);
+app.get('/api/fraud/academic-metrics', verifyToken, fraudAPI.getAcademicMetrics);
+app.get('/api/fraud/confusion-matrix', verifyToken, fraudAPI.getConfusionMatrix);
+app.get('/api/fraud/metrics-history', verifyToken, fraudAPI.getMetricsHistory);
+app.get('/api/fraud/error-analysis', verifyToken, fraudAPI.getErrorAnalysis);
+app.get('/api/fraud/threshold-analysis', verifyToken, fraudAPI.getThresholdAnalysis);
+app.get('/api/fraud/export-dataset', verifyToken, fraudAPI.exportDataset);
 
 // Start the server
 const PORT = process.env.PORT || 8080;

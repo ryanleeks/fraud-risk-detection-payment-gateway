@@ -251,11 +251,155 @@ const createFraudLogsTable = () => {
         db.exec("ALTER TABLE fraud_logs ADD COLUMN detection_method TEXT DEFAULT 'rules'");
         console.log('✅ Added detection_method column to fraud_logs');
       }
+
+      // Ground truth tracking columns for academic metrics
+      if (!columnNames.includes('ground_truth')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ground_truth TEXT");
+        console.log('✅ Added ground_truth column to fraud_logs');
+      }
+
+      if (!columnNames.includes('verified_at')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN verified_at DATETIME");
+        console.log('✅ Added verified_at column to fraud_logs');
+      }
+
+      if (!columnNames.includes('verified_by')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN verified_by INTEGER");
+        console.log('✅ Added verified_by column to fraud_logs');
+      }
+
+      if (!columnNames.includes('is_true_positive')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN is_true_positive INTEGER");
+        console.log('✅ Added is_true_positive column to fraud_logs');
+      }
+
+      if (!columnNames.includes('is_false_positive')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN is_false_positive INTEGER");
+        console.log('✅ Added is_false_positive column to fraud_logs');
+      }
+
+      if (!columnNames.includes('is_true_negative')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN is_true_negative INTEGER");
+        console.log('✅ Added is_true_negative column to fraud_logs');
+      }
+
+      if (!columnNames.includes('is_false_negative')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN is_false_negative INTEGER");
+        console.log('✅ Added is_false_negative column to fraud_logs');
+      }
     } catch (error) {
       console.error('Error adding AI columns:', error.message);
     }
   } catch (error) {
     // Table might already exist, that's okay
+  }
+};
+
+/**
+ * Verify ground truth for a fraud log entry
+ * Updates confusion matrix classifications
+ * @param {number} logId - Fraud log ID
+ * @param {string} groundTruth - 'fraud' or 'legitimate'
+ * @param {number} verifiedBy - User ID of admin who verified
+ * @returns {Object} Updated log entry
+ */
+const verifyGroundTruth = async (logId, groundTruth, verifiedBy) => {
+  try {
+    // Get the fraud log entry
+    const log = db.prepare('SELECT * FROM fraud_logs WHERE id = ?').get(logId);
+
+    if (!log) {
+      throw new Error('Fraud log not found');
+    }
+
+    // Determine confusion matrix classification
+    // Predicted: Based on action_taken (BLOCK/REVIEW = positive, ALLOW/CHALLENGE = negative)
+    // Actual: Based on ground_truth
+
+    const predictedPositive = log.action_taken === 'BLOCK' || log.action_taken === 'REVIEW';
+    const actualPositive = groundTruth === 'fraud';
+
+    let isTP = 0, isFP = 0, isTN = 0, isFN = 0;
+
+    if (predictedPositive && actualPositive) {
+      isTP = 1; // True Positive: Correctly identified fraud
+    } else if (predictedPositive && !actualPositive) {
+      isFP = 1; // False Positive: Incorrectly flagged legitimate as fraud
+    } else if (!predictedPositive && !actualPositive) {
+      isTN = 1; // True Negative: Correctly allowed legitimate
+    } else if (!predictedPositive && actualPositive) {
+      isFN = 1; // False Negative: Missed fraud (allowed it through)
+    }
+
+    // Update the fraud log
+    db.prepare(`
+      UPDATE fraud_logs
+      SET
+        ground_truth = ?,
+        verified_at = CURRENT_TIMESTAMP,
+        verified_by = ?,
+        is_true_positive = ?,
+        is_false_positive = ?,
+        is_true_negative = ?,
+        is_false_negative = ?
+      WHERE id = ?
+    `).run(groundTruth, verifiedBy, isTP, isFP, isTN, isFN, logId);
+
+    console.log(`✅ Ground truth verified for log ${logId}: ${groundTruth} (TP:${isTP} FP:${isFP} TN:${isTN} FN:${isFN})`);
+
+    return db.prepare('SELECT * FROM fraud_logs WHERE id = ?').get(logId);
+  } catch (error) {
+    console.error('Verify ground truth error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get unverified fraud logs for manual review
+ * @param {number} limit - Number of records to return
+ * @returns {Array} Unverified fraud logs
+ */
+const getUnverifiedLogs = (limit = 50) => {
+  try {
+    return db.prepare(`
+      SELECT
+        fl.*,
+        u.full_name,
+        u.account_id,
+        u.email
+      FROM fraud_logs fl
+      JOIN users u ON fl.user_id = u.id
+      WHERE fl.ground_truth IS NULL
+      ORDER BY fl.created_at DESC
+      LIMIT ?
+    `).all(limit);
+  } catch (error) {
+    console.error('Get unverified logs error:', error);
+    return [];
+  }
+};
+
+/**
+ * Get verified fraud logs
+ * @param {number} limit - Number of records to return
+ * @returns {Array} Verified fraud logs
+ */
+const getVerifiedLogs = (limit = 100) => {
+  try {
+    return db.prepare(`
+      SELECT
+        fl.*,
+        u.full_name,
+        u.account_id
+      FROM fraud_logs fl
+      JOIN users u ON fl.user_id = u.id
+      WHERE fl.ground_truth IS NOT NULL
+      ORDER BY fl.verified_at DESC
+      LIMIT ?
+    `).all(limit);
+  } catch (error) {
+    console.error('Get verified logs error:', error);
+    return [];
   }
 };
 
@@ -266,5 +410,8 @@ module.exports = {
   logFraudCheck,
   getUserStats,
   getSystemMetrics,
-  getRecentHighRiskTransactions
+  getRecentHighRiskTransactions,
+  verifyGroundTruth,
+  getUnverifiedLogs,
+  getVerifiedLogs
 };

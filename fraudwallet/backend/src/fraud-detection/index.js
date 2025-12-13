@@ -1,153 +1,142 @@
 // Main Fraud Detection Engine
-// Coordinates all fraud detection rules and scoring
-// NOW WITH AI INTEGRATION (Gemini Pro)
+// AI-ONLY DETECTION with Academic Metrics
+// Uses Google Gemini Pro for intelligent fraud pattern recognition
 
-const velocityRules = require('./rules/velocityRules');
-const amountRules = require('./rules/amountRules');
-const behavioralRules = require('./rules/behavioralRules');
-const riskScorer = require('./scoring/riskScorer');
 const fraudLogger = require('./monitoring/fraudLogger');
 const geminiAI = require('./geminiAI');
-const ScoreFusion = require('./scoreFusion');
 const db = require('../database');
 
 /**
- * Main fraud detection function - HYBRID SYSTEM (Rules + AI)
- * Analyzes a transaction using both rule-based and AI detection
+ * Main fraud detection function - AI-ONLY SYSTEM
+ * Analyzes a transaction using Google Gemini Pro AI
  *
  * EXECUTION FLOW:
- * 1. Run rule-based detection (fast, ~10ms)
- * 2. Run AI analysis in parallel (slower, ~2s)
- * 3. Fuse scores intelligently
- * 4. Return comprehensive result
+ * 1. Prepare user context (profile + transaction history)
+ * 2. Send to Gemini AI for analysis
+ * 3. Use AI score directly (no fusion)
+ * 4. Log with ground truth tracking for academic metrics
  *
  * @param {Object} transaction - Transaction details
  * @param {number} transaction.userId - User ID
  * @param {number} transaction.amount - Transaction amount
  * @param {string} transaction.type - Transaction type (transfer_sent, deposit, etc)
  * @param {number} transaction.recipientId - Recipient ID (optional)
- * @param {Object} userContext - Additional user context
- * @param {boolean} useAI - Whether to use AI detection (default: true)
+ * @param {Object} userContext - Additional user context (optional)
  * @returns {Object} Fraud assessment result
  */
-const analyzeFraudRisk = async (transaction, userContext = {}, useAI = true) => {
+const analyzeFraudRisk = async (transaction, userContext = {}) => {
   const startTime = Date.now();
 
   try {
-    console.log(`\n🔍 Analyzing transaction: RM${transaction.amount} (${transaction.type})`);
+    console.log(`\n🔍 AI-Only Fraud Detection: RM${transaction.amount} (${transaction.type})`);
 
-    // ==========================================
-    // STEP 1: RULE-BASED DETECTION (Always runs)
-    // ==========================================
-    const triggeredRules = [];
-
-    // Run velocity checks
-    const velocityChecks = await velocityRules.checkVelocity(transaction, userContext);
-    triggeredRules.push(...velocityChecks.rules);
-
-    // Run amount checks
-    const amountChecks = amountRules.checkAmount(transaction, userContext);
-    triggeredRules.push(...amountChecks.rules);
-
-    // Run behavioral checks
-    const behavioralChecks = await behavioralRules.checkBehavior(transaction, userContext);
-    triggeredRules.push(...behavioralChecks.rules);
-
-    // Calculate rule-based risk score
-    const ruleAssessment = riskScorer.calculateRiskScore(triggeredRules, transaction);
-    const ruleScore = ruleAssessment.score;
-
-    console.log(`   📋 Rule-based score: ${ruleScore}/100 (${triggeredRules.length} rules triggered)`);
-
-    // ==========================================
-    // STEP 2: AI DETECTION (Parallel analysis)
-    // ==========================================
-    let aiAnalysis = null;
-    let detectionMethod = 'rules';
-
-    if (useAI && geminiAI.enabled) {
-      try {
-        console.log(`   🤖 Running AI analysis...`);
-
-        // Prepare context for AI
-        const userProfile = await getUserProfile(transaction.userId);
-        const recentTransactions = await getRecentTransactions(transaction.userId);
-
-        // Call Gemini AI
-        aiAnalysis = await geminiAI.analyzeTransaction(
-          transaction,
-          userProfile,
-          recentTransactions
-        );
-
-        if (!aiAnalysis.error) {
-          detectionMethod = 'hybrid';
-          console.log(`   🤖 AI score: ${aiAnalysis.riskScore}/100 (${aiAnalysis.confidence}% confidence)`);
-        } else {
-          console.log(`   ⚠️  AI unavailable: ${aiAnalysis.errorType}`);
-        }
-
-      } catch (error) {
-        console.error('   ❌ AI analysis failed:', error.message);
-        aiAnalysis = { error: true, riskScore: 0 };
-      }
+    // Check if AI is enabled
+    if (!geminiAI.enabled) {
+      console.warn('⚠️  AI detection disabled - GEMINI_API_KEY not configured');
+      return {
+        fraudulent: false,
+        riskScore: 0,
+        riskLevel: 'UNKNOWN',
+        action: 'ALLOW',
+        triggeredRules: [],
+        detectionMethod: 'disabled',
+        error: 'AI detection disabled',
+        executionTime: Date.now() - startTime
+      };
     }
 
     // ==========================================
-    // STEP 3: SCORE FUSION
+    // STEP 1: PREPARE CONTEXT FOR AI
     // ==========================================
-    let finalScore = ruleScore;
-    let action = determineAction(ruleScore);
+    const userProfile = await getUserProfile(transaction.userId);
+    const recentTransactions = await getRecentTransactions(transaction.userId);
 
-    if (aiAnalysis && !aiAnalysis.error) {
-      // Fuse rule-based and AI scores
-      finalScore = ScoreFusion.fuseScores(
-        ruleScore,
-        aiAnalysis.riskScore,
-        aiAnalysis.confidence,
-        false
+    console.log(`   📊 Context: ${recentTransactions.length} recent transactions, account age ${getAccountAgeDays(userProfile.created_at)} days`);
+
+    // ==========================================
+    // STEP 2: AI ANALYSIS (Only detection method)
+    // ==========================================
+    console.log(`   🤖 Sending to Gemini AI for analysis...`);
+
+    let aiAnalysis;
+    try {
+      aiAnalysis = await geminiAI.analyzeTransaction(
+        transaction,
+        userProfile,
+        recentTransactions
       );
-      action = determineAction(finalScore);
+    } catch (error) {
+      console.error('   ❌ AI analysis failed:', error.message);
+      return {
+        fraudulent: false,
+        riskScore: 0,
+        riskLevel: 'UNKNOWN',
+        action: 'ALLOW',
+        triggeredRules: [],
+        detectionMethod: 'error',
+        error: error.message,
+        executionTime: Date.now() - startTime
+      };
+    }
 
-      console.log(`   ⚖️  Final fused score: ${finalScore}/100 → ${action}`);
+    // Handle AI errors (rate limit, network, etc.)
+    if (aiAnalysis.error) {
+      console.warn(`   ⚠️  AI unavailable: ${aiAnalysis.errorType}`);
+      return {
+        fraudulent: false,
+        riskScore: 0,
+        riskLevel: 'UNKNOWN',
+        action: 'ALLOW',
+        triggeredRules: [],
+        detectionMethod: 'error',
+        error: aiAnalysis.errorType,
+        executionTime: Date.now() - startTime
+      };
     }
 
     // ==========================================
-    // STEP 4: PREPARE COMPREHENSIVE RESULT
+    // STEP 3: USE AI SCORE DIRECTLY
+    // ==========================================
+    const finalScore = aiAnalysis.riskScore;
+    const action = determineAction(finalScore);
+    const riskLevel = getRiskLevel(finalScore);
+
+    console.log(`   🤖 AI Risk Score: ${finalScore}/100 (${aiAnalysis.confidence}% confidence)`);
+    console.log(`   🎯 Action: ${action} | Risk Level: ${riskLevel}`);
+    console.log(`   💬 Reasoning: ${aiAnalysis.reasoning}`);
+
+    if (aiAnalysis.redFlags && aiAnalysis.redFlags.length > 0) {
+      console.log(`   🚩 Red Flags: ${aiAnalysis.redFlags.join(', ')}`);
+    }
+
+    // ==========================================
+    // STEP 4: PREPARE RESULT
     // ==========================================
     const result = {
       fraudulent: action === 'BLOCK',
       riskScore: finalScore,
-      riskLevel: getRiskLevel(finalScore),
+      riskLevel: riskLevel,
       action: action,
-      triggeredRules: triggeredRules,
-      riskBreakdown: ruleAssessment.breakdown,
-      detectionMethod: detectionMethod,
+      triggeredRules: [], // No rules in AI-only mode
+      detectionMethod: 'ai',
 
-      // Rule-based analysis
-      ruleBasedAnalysis: {
-        score: ruleScore,
-        triggeredRules: triggeredRules,
-        level: ruleAssessment.level
-      },
-
-      // AI analysis (if available)
-      aiAnalysis: aiAnalysis && !aiAnalysis.error ? {
+      // AI analysis
+      aiAnalysis: {
         riskScore: aiAnalysis.riskScore,
         confidence: aiAnalysis.confidence,
         reasoning: aiAnalysis.reasoning,
         redFlags: aiAnalysis.redFlags,
         recommendedChecks: aiAnalysis.recommendedChecks,
         responseTime: aiAnalysis.responseTime
-      } : null,
+      },
 
       executionTime: Date.now() - startTime
     };
 
-    // Log for monitoring and analysis
+    // Log for monitoring and academic metrics tracking
     await fraudLogger.logFraudCheck(transaction, result);
 
-    console.log(`   ✅ Detection complete (${result.executionTime}ms)\n`);
+    console.log(`   ✅ AI Detection complete (${result.executionTime}ms)\n`);
 
     return result;
 
@@ -198,6 +187,17 @@ const getRecentTransactions = async (userId, hours = 24) => {
     console.error('Error getting recent transactions:', error);
     return [];
   }
+};
+
+/**
+ * Calculate account age in days
+ */
+const getAccountAgeDays = (createdAt) => {
+  if (!createdAt) return 0;
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now - created;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 };
 
 /**

@@ -2,6 +2,8 @@
 // Provides access to fraud detection metrics and statistics
 
 const fraudDetection = require('./fraud-detection');
+const fraudLogger = require('./fraud-detection/monitoring/fraudLogger');
+const academicMetrics = require('./fraud-detection/monitoring/academicMetrics');
 const db = require('./database');
 
 /**
@@ -390,6 +392,224 @@ const getDisagreementCases = async (req, res) => {
   }
 };
 
+/**
+ * Verify ground truth for a fraud log (admin only)
+ */
+const verifyGroundTruth = async (req, res) => {
+  try {
+    const { logId } = req.params;
+    const { groundTruth } = req.body;
+
+    // Validate input
+    if (!groundTruth || !['fraud', 'legitimate'].includes(groundTruth)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ground truth value. Must be "fraud" or "legitimate"'
+      });
+    }
+
+    // Verify as admin (user ID from auth)
+    const verifiedBy = req.user.userId;
+
+    const updatedLog = await fraudLogger.verifyGroundTruth(
+      parseInt(logId),
+      groundTruth,
+      verifiedBy
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Ground truth verified successfully',
+      log: updatedLog
+    });
+  } catch (error) {
+    console.error('Verify ground truth error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error verifying ground truth'
+    });
+  }
+};
+
+/**
+ * Get unverified fraud logs for review
+ */
+const getUnverifiedLogs = async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    const logs = fraudLogger.getUnverifiedLogs(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      logs: logs.map(log => ({
+        ...log,
+        ai_red_flags: log.ai_red_flags ? JSON.parse(log.ai_red_flags) : []
+      }))
+    });
+  } catch (error) {
+    console.error('Get unverified logs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching unverified logs'
+    });
+  }
+};
+
+/**
+ * Get verified fraud logs
+ */
+const getVerifiedLogs = async (req, res) => {
+  try {
+    const { limit = 100 } = req.query;
+
+    const logs = fraudLogger.getVerifiedLogs(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      logs: logs.map(log => ({
+        ...log,
+        ai_red_flags: log.ai_red_flags ? JSON.parse(log.ai_red_flags) : []
+      }))
+    });
+  } catch (error) {
+    console.error('Get verified logs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching verified logs'
+    });
+  }
+};
+
+/**
+ * Get comprehensive academic metrics
+ */
+const getAcademicMetrics = async (req, res) => {
+  try {
+    const metrics = academicMetrics.getAcademicMetrics();
+
+    res.status(200).json({
+      success: true,
+      metrics: metrics
+    });
+  } catch (error) {
+    console.error('Get academic metrics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching academic metrics'
+    });
+  }
+};
+
+/**
+ * Get confusion matrix
+ */
+const getConfusionMatrix = async (req, res) => {
+  try {
+    const matrix = academicMetrics.getConfusionMatrix();
+
+    res.status(200).json({
+      success: true,
+      confusionMatrix: matrix
+    });
+  } catch (error) {
+    console.error('Get confusion matrix error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching confusion matrix'
+    });
+  }
+};
+
+/**
+ * Get metrics history over time
+ */
+const getMetricsHistory = async (req, res) => {
+  try {
+    const { days = 30, interval = 'day' } = req.query;
+
+    const history = academicMetrics.getMetricsHistory(
+      parseInt(days),
+      interval
+    );
+
+    res.status(200).json({
+      success: true,
+      count: history.length,
+      history: history
+    });
+  } catch (error) {
+    console.error('Get metrics history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching metrics history'
+    });
+  }
+};
+
+/**
+ * Get error analysis (false positives and false negatives)
+ */
+const getErrorAnalysis = async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+
+    const analysis = academicMetrics.getErrorAnalysis(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      analysis: analysis
+    });
+  } catch (error) {
+    console.error('Get error analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching error analysis'
+    });
+  }
+};
+
+/**
+ * Get threshold analysis for ROC curve
+ */
+const getThresholdAnalysis = async (req, res) => {
+  try {
+    const analysis = academicMetrics.getThresholdAnalysis();
+
+    res.status(200).json({
+      success: true,
+      analysis: analysis
+    });
+  } catch (error) {
+    console.error('Get threshold analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching threshold analysis'
+    });
+  }
+};
+
+/**
+ * Export dataset for academic analysis
+ */
+const exportDataset = async (req, res) => {
+  try {
+    const csv = academicMetrics.exportDataset();
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="fraud_detection_dataset.csv"');
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Export dataset error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting dataset'
+    });
+  }
+};
+
 module.exports = {
   getUserFraudStats,
   getSystemMetrics,
@@ -397,8 +617,18 @@ module.exports = {
   getHighRiskUsers,
   getTopFlaggedUsers,
   getUserFraudDetails,
-  // New AI endpoints
+  // AI endpoints
   getAIFraudLogs,
   getAIMetrics,
-  getDisagreementCases
+  getDisagreementCases,
+  // Academic metrics endpoints
+  verifyGroundTruth,
+  getUnverifiedLogs,
+  getVerifiedLogs,
+  getAcademicMetrics,
+  getConfusionMatrix,
+  getMetricsHistory,
+  getErrorAnalysis,
+  getThresholdAnalysis,
+  exportDataset
 };
