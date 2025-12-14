@@ -85,6 +85,11 @@ const createUsersTable = () => {
       db.exec("ALTER TABLE users ADD COLUMN wallet_balance REAL DEFAULT 0.00");
       console.log('✅ Added wallet_balance column');
     }
+
+    if (!columnNames.includes('role')) {
+      db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+      console.log('✅ Added role column');
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }
