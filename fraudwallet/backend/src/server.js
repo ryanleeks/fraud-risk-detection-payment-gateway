@@ -43,7 +43,7 @@ app.post('/api/auth/verify-2fa', auth.verify2FA);
 
 // User profile routes (protected - require authentication)
 const user = require('./user');
-const { verifyToken } = require('./middleware');
+const { verifyToken, verifyAdminToken } = require('./middleware');
 app.get('/api/user/profile', verifyToken, user.getProfile);
 app.put('/api/user/profile', verifyToken, user.updateProfile);
 app.put('/api/user/phone', verifyToken, user.changePhoneNumber);
@@ -86,16 +86,23 @@ app.get('/api/fraud/ai-logs', verifyToken, fraudAPI.getAIFraudLogs);
 app.get('/api/fraud/ai-metrics', verifyToken, fraudAPI.getAIMetrics);
 app.get('/api/fraud/ai-disagreements', verifyToken, fraudAPI.getDisagreementCases);
 
-// Academic Metrics routes (for final year project)
-app.post('/api/fraud/verify/:logId', verifyToken, fraudAPI.verifyGroundTruth);
-app.get('/api/fraud/unverified-logs', verifyToken, fraudAPI.getUnverifiedLogs);
-app.get('/api/fraud/verified-logs', verifyToken, fraudAPI.getVerifiedLogs);
-app.get('/api/fraud/academic-metrics', verifyToken, fraudAPI.getAcademicMetrics);
-app.get('/api/fraud/confusion-matrix', verifyToken, fraudAPI.getConfusionMatrix);
-app.get('/api/fraud/metrics-history', verifyToken, fraudAPI.getMetricsHistory);
-app.get('/api/fraud/error-analysis', verifyToken, fraudAPI.getErrorAnalysis);
-app.get('/api/fraud/threshold-analysis', verifyToken, fraudAPI.getThresholdAnalysis);
-app.get('/api/fraud/export-dataset', verifyToken, fraudAPI.exportDataset);
+// Academic Metrics routes (Admin only - for final year project)
+app.post('/api/fraud/verify/:logId', verifyAdminToken, fraudAPI.verifyGroundTruth);
+app.get('/api/fraud/unverified-logs', verifyAdminToken, fraudAPI.getUnverifiedLogs);
+app.get('/api/fraud/verified-logs', verifyAdminToken, fraudAPI.getVerifiedLogs);
+app.get('/api/fraud/academic-metrics', verifyAdminToken, fraudAPI.getAcademicMetrics);
+app.get('/api/fraud/confusion-matrix', verifyAdminToken, fraudAPI.getConfusionMatrix);
+app.get('/api/fraud/metrics-history', verifyAdminToken, fraudAPI.getMetricsHistory);
+app.get('/api/fraud/error-analysis', verifyAdminToken, fraudAPI.getErrorAnalysis);
+app.get('/api/fraud/threshold-analysis', verifyAdminToken, fraudAPI.getThresholdAnalysis);
+app.get('/api/fraud/export-dataset', verifyAdminToken, fraudAPI.exportDataset);
+
+// Admin routes (Admin only)
+const adminAPI = require('./adminAPI');
+app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);
+app.get('/api/admin/users/:userId', verifyAdminToken, adminAPI.getUserById);
+app.patch('/api/admin/users/:userId/status', verifyAdminToken, adminAPI.updateUserStatus);
+app.patch('/api/admin/users/:userId/password', verifyAdminToken, adminAPI.resetUserPassword);
 
 // Start the server
 const PORT = process.env.PORT || 8080;
