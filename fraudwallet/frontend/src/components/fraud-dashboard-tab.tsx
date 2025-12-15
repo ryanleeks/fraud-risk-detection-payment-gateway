@@ -71,6 +71,17 @@ export function FraudDashboardTab() {
       const userStatsData = await userStatsResponse.json()
       if (userStatsData.success && userStatsData.stats) {
         setUserStats(userStatsData.stats)
+      } else {
+        // Set default values when no data
+        setUserStats({
+          total_checks: 0,
+          avg_risk_score: 0,
+          max_risk_score: 0,
+          blocked_count: 0,
+          review_count: 0,
+          critical_count: 0,
+          high_count: 0
+        })
       }
 
       // Fetch system metrics
@@ -78,6 +89,15 @@ export function FraudDashboardTab() {
       const metricsData = await metricsResponse.json()
       if (metricsData.success && metricsData.metrics) {
         setSystemMetrics(metricsData.metrics)
+      } else {
+        // Set default values when no data
+        setSystemMetrics({
+          totalChecks: 0,
+          blockedTransactions: 0,
+          reviewedTransactions: 0,
+          averageRiskScore: 0,
+          highRiskUsers: 0
+        })
       }
 
       // Fetch high-risk users
@@ -109,6 +129,22 @@ export function FraudDashboardTab() {
     } catch (err) {
       console.error("Load fraud data error:", err)
       // Reset to safe defaults on error
+      setUserStats({
+        total_checks: 0,
+        avg_risk_score: 0,
+        max_risk_score: 0,
+        blocked_count: 0,
+        review_count: 0,
+        critical_count: 0,
+        high_count: 0
+      })
+      setSystemMetrics({
+        totalChecks: 0,
+        blockedTransactions: 0,
+        reviewedTransactions: 0,
+        averageRiskScore: 0,
+        highRiskUsers: 0
+      })
       setHighRiskUsers([])
       setTopFlaggedUsers([])
       setRecentLogs([])
@@ -218,45 +254,43 @@ export function FraudDashboardTab() {
         {activeView === "overview" && (
           <>
             {/* Trustworthiness Health Bar */}
-            {userStats && (
-              <Card className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`} />
-                      <h3 className="font-semibold">Account Trustworthiness</h3>
-                    </div>
-                    <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`}>
-                      {getTrustworthinessLevel(userStats.avg_risk_score || 0).level}
-                    </span>
+            <Card className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`} />
+                    <h3 className="font-semibold">Account Trustworthiness</h3>
                   </div>
-
-                  {/* Health Bar */}
-                  <div className="space-y-2">
-                    <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${getTrustworthinessLevel(userStats.avg_risk_score || 0).color} transition-all duration-500`}
-                        style={{ width: `${getTrustworthinessLevel(userStats.avg_risk_score || 0).percentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Avg Risk Score: {userStats.avg_risk_score?.toFixed(1) || 0}/100</span>
-                      <span>{userStats.total_checks || 0} transactions checked</span>
-                    </div>
-                  </div>
-
-                  {userStats.avg_risk_score > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {userStats.avg_risk_score < 40
-                        ? "Great! Your account shows low risk activity. Keep up the secure practices!"
-                        : userStats.avg_risk_score < 60
-                        ? "Your account has moderate risk. Consider reviewing your transaction patterns."
-                        : "Your account shows high risk activity. Please contact support if you need assistance."}
-                    </p>
-                  )}
+                  <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
+                    {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
+                  </span>
                 </div>
-              </Card>
-            )}
+
+                {/* Health Bar */}
+                <div className="space-y-2">
+                  <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).color} transition-all duration-500`}
+                      style={{ width: `${getTrustworthinessLevel(userStats?.avg_risk_score || 0).percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Avg Risk Score: {userStats?.avg_risk_score?.toFixed(1) || 0}/100</span>
+                    <span>{userStats?.total_checks || 0} transactions checked</span>
+                  </div>
+                </div>
+
+                {(userStats?.avg_risk_score || 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {(userStats?.avg_risk_score || 0) < 40
+                      ? "Great! Your account shows low risk activity. Keep up the secure practices!"
+                      : (userStats?.avg_risk_score || 0) < 60
+                      ? "Your account has moderate risk. Consider reviewing your transaction patterns."
+                      : "Your account shows high risk activity. Please contact support if you need assistance."}
+                  </p>
+                )}
+              </div>
+            </Card>
 
             <div className="grid grid-cols-2 gap-4">
             <Card className="p-4">
