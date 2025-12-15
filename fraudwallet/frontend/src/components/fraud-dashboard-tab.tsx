@@ -254,12 +254,17 @@ export function FraudDashboardTab() {
         {activeView === "overview" && (
           <>
             {/* Trustworthiness Health Bar */}
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`} />
-                    <h3 className="font-semibold">Account Trustworthiness</h3>
+            {userStats && userStats.total_checks > 0 && (
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`} />
+                      <h3 className="font-semibold">Account Trustworthiness</h3>
+                    </div>
+                    <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`}>
+                      {getTrustworthinessLevel(userStats.avg_risk_score || 0).level}
+                    </span>
                   </div>
                   <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
                     {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
@@ -292,6 +297,22 @@ export function FraudDashboardTab() {
               </div>
             </Card>
 
+            {/* No Data State */}
+            {(!systemMetrics || systemMetrics.totalChecks === 0) && (
+              <Card className="p-6 text-center">
+                <Shield className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+                <h3 className="font-semibold text-lg mb-2">No Fraud Data Yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Start making transactions to see your fraud detection analytics here.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Your transactions will be automatically analyzed for fraud risk and displayed on this dashboard.
+                </p>
+              </Card>
+            )}
+
+            {/* Metrics Cards - Only show if we have data */}
+            {systemMetrics && systemMetrics.totalChecks > 0 && (
             <div className="grid grid-cols-2 gap-4">
             <Card className="p-4">
               <div className="flex items-center justify-between">
@@ -345,8 +366,10 @@ export function FraudDashboardTab() {
               </div>
             </Card>
           </div>
+          )}
 
           {/* Quick Actions */}
+          {systemMetrics && systemMetrics.totalChecks > 0 && (
           <div className="grid grid-cols-3 gap-2">
             <Button
               onClick={() => setActiveView("high-risk")}
@@ -373,6 +396,7 @@ export function FraudDashboardTab() {
               Recent Logs
             </Button>
           </div>
+          )}
           </>
         )}
 
