@@ -23,6 +23,10 @@ interface FraudLog {
   action_taken: string
   created_at: string
   ground_truth?: string
+  ip_address?: string
+  country?: string
+  city?: string
+  location_changed?: number
 }
 
 export function FraudVerificationTab() {
@@ -195,6 +199,26 @@ export function FraudVerificationTab() {
                           <span className="text-muted-foreground">Confidence:</span>
                           <span className="ml-2 font-medium">{log.ai_confidence}%</span>
                         </div>
+                        {log.ip_address && (
+                          <>
+                            <div>
+                              <span className="text-muted-foreground">IP Address:</span>
+                              <span className="ml-2 font-medium font-mono text-xs">{log.ip_address}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Location:</span>
+                              <span className="ml-2 font-medium">
+                                {log.city}, {log.country}
+                                {log.location_changed === 1 && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Location Changed
+                                  </Badge>
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* AI Reasoning */}

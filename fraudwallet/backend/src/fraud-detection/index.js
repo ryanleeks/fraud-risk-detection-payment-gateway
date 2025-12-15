@@ -5,6 +5,7 @@
 const fraudLogger = require('./monitoring/fraudLogger');
 const geminiAI = require('./geminiAI');
 const db = require('../database');
+const { getLocationFromIP, checkLocationChange } = require('./utils/geolocation');
 
 /**
  * Main fraud detection function - AI-ONLY SYSTEM
@@ -51,7 +52,19 @@ const analyzeFraudRisk = async (transaction, userContext = {}) => {
     const userProfile = await getUserProfile(transaction.userId);
     const recentTransactions = await getRecentTransactions(transaction.userId);
 
+    // Get location data from IP address
+    const ipAddress = transaction.ipAddress || transaction.ip;
+    const currentLocation = getLocationFromIP(ipAddress);
+    const locationCheck = await checkLocationChange(transaction.userId, currentLocation);
+
     console.log(`   📊 Context: ${recentTransactions.length} recent transactions, account age ${getAccountAgeDays(userProfile.created_at)} days`);
+    console.log(`   📍 Location: ${currentLocation.city}, ${currentLocation.country} (IP: ${currentLocation.ip})`);
+
+    if (locationCheck.suspicious) {
+      console.log(`   ⚠️  ${locationCheck.message}`);
+    } else if (locationCheck.locationChanged) {
+      console.log(`   ℹ️  ${locationCheck.message}`);
+    }
 
     // ==========================================
     // STEP 2: AI ANALYSIS (Only detection method)
@@ -131,6 +144,15 @@ const analyzeFraudRisk = async (transaction, userContext = {}) => {
       },
 
       executionTime: Date.now() - startTime
+    };
+
+    // Add location data to transaction for logging
+    transaction.locationData = {
+      ...currentLocation,
+      locationChanged: locationCheck.locationChanged,
+      suspicious: locationCheck.suspicious,
+      distance: locationCheck.distance,
+      speed: locationCheck.speed
     };
 
     // Log for monitoring and academic metrics tracking

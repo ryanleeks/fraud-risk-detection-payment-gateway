@@ -278,6 +278,18 @@ const getTransactionHistory = (req, res) => {
 };
 
 /**
+ * Extract IP address from request
+ */
+const getClientIP = (req) => {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+         req.headers['x-real-ip'] ||
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.ip ||
+         'unknown';
+};
+
+/**
  * SEND MONEY TO ANOTHER USER
  * Transfer funds from one user to another
  */
@@ -285,6 +297,7 @@ const sendMoney = async (req, res) => {
   try {
     const senderId = req.user.userId;
     const { recipientId, amount, note } = req.body;
+    const ipAddress = getClientIP(req);
 
     // Validate recipient
     if (!recipientId) {
@@ -334,7 +347,8 @@ const sendMoney = async (req, res) => {
       userId: senderId,
       amount: validatedAmount,
       type: 'transfer_sent',
-      recipientId: recipientId
+      recipientId: recipientId,
+      ipAddress: ipAddress
     }, {
       walletBalance: sender.wallet_balance,
       accountCreated: sender.created_at

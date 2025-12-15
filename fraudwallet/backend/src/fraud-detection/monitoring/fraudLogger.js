@@ -17,7 +17,10 @@ const logFraudCheck = async (transaction, fraudResult) => {
     const aiAnalysis = fraudResult.aiAnalysis || {};
     const ruleAnalysis = fraudResult.ruleBasedAnalysis || {};
 
-    // Insert fraud check log with AI data
+    // Extract location data if available
+    const locationData = transaction.locationData || {};
+
+    // Insert fraud check log with AI and location data
     db.prepare(`
       INSERT INTO fraud_logs (
         user_id,
@@ -35,8 +38,14 @@ const logFraudCheck = async (transaction, fraudResult) => {
         ai_red_flags,
         ai_response_time,
         detection_method,
+        ip_address,
+        country,
+        city,
+        latitude,
+        longitude,
+        location_changed,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       transaction.userId,
       transaction.type,
@@ -52,7 +61,13 @@ const logFraudCheck = async (transaction, fraudResult) => {
       aiAnalysis.reasoning || null,
       JSON.stringify(aiAnalysis.redFlags || []),
       aiAnalysis.responseTime || null,
-      fraudResult.detectionMethod || 'rules'
+      fraudResult.detectionMethod || 'rules',
+      locationData.ip || null,
+      locationData.country || null,
+      locationData.city || null,
+      locationData.latitude || null,
+      locationData.longitude || null,
+      locationData.locationChanged ? 1 : 0
     );
 
     // Log to console for real-time monitoring
@@ -286,6 +301,37 @@ const createFraudLogsTable = () => {
       if (!columnNames.includes('is_false_negative')) {
         db.exec("ALTER TABLE fraud_logs ADD COLUMN is_false_negative INTEGER");
         console.log('✅ Added is_false_negative column to fraud_logs');
+      }
+
+      // IP address and geolocation columns
+      if (!columnNames.includes('ip_address')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN ip_address TEXT");
+        console.log('✅ Added ip_address column to fraud_logs');
+      }
+
+      if (!columnNames.includes('country')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN country TEXT");
+        console.log('✅ Added country column to fraud_logs');
+      }
+
+      if (!columnNames.includes('city')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN city TEXT");
+        console.log('✅ Added city column to fraud_logs');
+      }
+
+      if (!columnNames.includes('latitude')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN latitude REAL");
+        console.log('✅ Added latitude column to fraud_logs');
+      }
+
+      if (!columnNames.includes('longitude')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN longitude REAL");
+        console.log('✅ Added longitude column to fraud_logs');
+      }
+
+      if (!columnNames.includes('location_changed')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN location_changed INTEGER DEFAULT 0");
+        console.log('✅ Added location_changed column to fraud_logs');
       }
     } catch (error) {
       console.error('Error adding AI columns:', error.message);
