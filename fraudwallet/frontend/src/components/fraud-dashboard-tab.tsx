@@ -3,11 +3,9 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, ClipboardCheck, BarChart3 } from "lucide-react"
+import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
-import { FraudVerificationTab } from "@/components/fraud-verification-tab"
-import { AcademicMetricsTab } from "@/components/academic-metrics-tab"
 
 interface FraudLog {
   id: number
@@ -49,7 +47,7 @@ export function FraudDashboardTab() {
   const [topFlaggedUsers, setTopFlaggedUsers] = useState<TopFlaggedUser[]>([])
   const [recentLogs, setRecentLogs] = useState<FraudLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState<"overview" | "high-risk" | "flagged" | "recent" | "verification" | "metrics">("overview")
+  const [activeView, setActiveView] = useState<"overview" | "high-risk" | "flagged" | "recent">("overview")
 
   const loadFraudData = async () => {
     setLoading(true)
@@ -273,28 +271,6 @@ export function FraudDashboardTab() {
               Recent Logs
             </Button>
           </div>
-
-          {/* Academic Features */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={() => setActiveView("verification")}
-              variant="default"
-              size="sm"
-              className="text-xs"
-            >
-              <ClipboardCheck className="h-4 w-4 mr-1" />
-              Verify Transactions
-            </Button>
-            <Button
-              onClick={() => setActiveView("metrics")}
-              variant="default"
-              size="sm"
-              className="text-xs"
-            >
-              <BarChart3 className="h-4 w-4 mr-1" />
-              Academic Metrics
-            </Button>
-          </div>
           </>
         )}
 
@@ -446,32 +422,6 @@ export function FraudDashboardTab() {
               ))}
             </div>
           )}
-          </div>
-        )}
-
-        {/* Verification View */}
-        {activeView === "verification" && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Ground Truth Verification</h2>
-              <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-                ← Back
-              </Button>
-            </div>
-            <FraudVerificationTab />
-          </div>
-        )}
-
-        {/* Academic Metrics View */}
-        {activeView === "metrics" && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Academic Metrics</h2>
-              <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
-                ← Back
-              </Button>
-            </div>
-            <AcademicMetricsTab />
           </div>
         )}
       </div>
