@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, Heart } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 
@@ -29,6 +29,16 @@ interface SystemMetrics {
   highRiskUsers: number
 }
 
+interface UserStats {
+  total_checks: number
+  avg_risk_score: number
+  max_risk_score: number
+  blocked_count: number
+  review_count: number
+  critical_count: number
+  high_count: number
+}
+
 interface TopFlaggedUser {
   user_id: number
   full_name: string
@@ -43,6 +53,7 @@ interface TopFlaggedUser {
 
 export function FraudDashboardTab() {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null)
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [highRiskUsers, setHighRiskUsers] = useState<FraudLog[]>([])
   const [topFlaggedUsers, setTopFlaggedUsers] = useState<TopFlaggedUser[]>([])
   const [recentLogs, setRecentLogs] = useState<FraudLog[]>([])
@@ -55,10 +66,17 @@ export function FraudDashboardTab() {
       const token = localStorage.getItem("token")
       const headers = { "Authorization": `Bearer ${token}` }
 
+      // Fetch user's personal stats
+      const userStatsResponse = await fetch("http://localhost:8080/api/fraud/user-stats", { headers })
+      const userStatsData = await userStatsResponse.json()
+      if (userStatsData.success && userStatsData.stats) {
+        setUserStats(userStatsData.stats)
+      }
+
       // Fetch system metrics
       const metricsResponse = await fetch("http://localhost:8080/api/fraud/system-metrics", { headers })
       const metricsData = await metricsResponse.json()
-      if (metricsData.success) {
+      if (metricsData.success && metricsData.metrics) {
         setSystemMetrics(metricsData.metrics)
       }
 
@@ -107,6 +125,15 @@ export function FraudDashboardTab() {
   useEffect(() => {
     loadFraudData()
   }, [])
+
+  const getTrustworthinessLevel = (avgRiskScore: number) => {
+    if (avgRiskScore === 0) return { level: "Excellent", color: "bg-green-600", textColor: "text-green-600", percentage: 100 }
+    if (avgRiskScore < 20) return { level: "Excellent", color: "bg-green-600", textColor: "text-green-600", percentage: 90 }
+    if (avgRiskScore < 40) return { level: "Good", color: "bg-blue-600", textColor: "text-blue-600", percentage: 70 }
+    if (avgRiskScore < 60) return { level: "Fair", color: "bg-yellow-600", textColor: "text-yellow-600", percentage: 50 }
+    if (avgRiskScore < 80) return { level: "Poor", color: "bg-orange-600", textColor: "text-orange-600", percentage: 30 }
+    return { level: "Critical", color: "bg-red-600", textColor: "text-red-600", percentage: 10 }
+  }
 
   const getRiskLevelColor = (level: string) => {
     switch (level.toLowerCase()) {
@@ -190,6 +217,47 @@ export function FraudDashboardTab() {
         {/* Overview Cards */}
         {activeView === "overview" && (
           <>
+            {/* Trustworthiness Health Bar */}
+            {userStats && (
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`} />
+                      <h3 className="font-semibold">Account Trustworthiness</h3>
+                    </div>
+                    <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats.avg_risk_score || 0).textColor}`}>
+                      {getTrustworthinessLevel(userStats.avg_risk_score || 0).level}
+                    </span>
+                  </div>
+
+                  {/* Health Bar */}
+                  <div className="space-y-2">
+                    <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${getTrustworthinessLevel(userStats.avg_risk_score || 0).color} transition-all duration-500`}
+                        style={{ width: `${getTrustworthinessLevel(userStats.avg_risk_score || 0).percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Avg Risk Score: {userStats.avg_risk_score?.toFixed(1) || 0}/100</span>
+                      <span>{userStats.total_checks || 0} transactions checked</span>
+                    </div>
+                  </div>
+
+                  {userStats.avg_risk_score > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {userStats.avg_risk_score < 40
+                        ? "Great! Your account shows low risk activity. Keep up the secure practices!"
+                        : userStats.avg_risk_score < 60
+                        ? "Your account has moderate risk. Consider reviewing your transaction patterns."
+                        : "Your account shows high risk activity. Please contact support if you need assistance."}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
             <Card className="p-4">
               <div className="flex items-center justify-between">
@@ -278,7 +346,7 @@ export function FraudDashboardTab() {
         {activeView === "high-risk" && (
           <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">High-Risk Users (Score ≥ 60)</h2>
+            <h2 className="text-lg font-semibold">High-Risk Users (Risk Score ≥ 60)</h2>
             <Button onClick={() => setActiveView("overview")} variant="ghost" size="sm">
               ← Back
             </Button>
@@ -306,7 +374,7 @@ export function FraudDashboardTab() {
                     <span className="text-muted-foreground">{user.transaction_type} • RM {user.amount.toFixed(2)}</span>
                     <div className="flex items-center gap-1">
                       {getActionIcon(user.action_taken)}
-                      <span className="font-semibold">Score: {user.risk_score}</span>
+                      <span className="font-semibold">Risk Score: {user.risk_score}</span>
                     </div>
                   </div>
                   {user.rules_triggered && user.rules_triggered.length > 0 && (
@@ -367,11 +435,11 @@ export function FraudDashboardTab() {
                       <p className="text-sm font-bold">{user.total_flags}</p>
                     </div>
                     <div className="rounded-lg bg-muted p-2">
-                      <p className="text-xs text-muted-foreground">Avg Score</p>
+                      <p className="text-xs text-muted-foreground">Avg Risk</p>
                       <p className="text-sm font-bold">{user.avg_risk_score.toFixed(1)}</p>
                     </div>
                     <div className="rounded-lg bg-muted p-2">
-                      <p className="text-xs text-muted-foreground">Max Score</p>
+                      <p className="text-xs text-muted-foreground">Max Risk</p>
                       <p className="text-sm font-bold">{user.max_risk_score}</p>
                     </div>
                   </div>
@@ -415,7 +483,7 @@ export function FraudDashboardTab() {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
                     <span className={`px-2 py-0.5 rounded-full border ${getRiskLevelColor(log.risk_level)}`}>
-                      Score: {log.risk_score}
+                      Risk Score: {log.risk_score}
                     </span>
                   </div>
                 </Card>
