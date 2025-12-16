@@ -14,6 +14,7 @@ interface TimeDisplayProps {
 /**
  * TimeDisplay Component
  * Displays timestamps in user's local timezone with UTC offset badge
+ * Click badge to toggle between UTC+8 and UTC+0
  */
 export const TimeDisplay: React.FC<TimeDisplayProps> = ({
   utcDate,
@@ -21,11 +22,7 @@ export const TimeDisplay: React.FC<TimeDisplayProps> = ({
   showBadge = true,
   className = ''
 }) => {
-  const { offsetHours, offsetLabel, loading } = useTimezone()
-
-  if (loading) {
-    return <span className={className}>Loading...</span>
-  }
+  const { offsetHours, offsetLabel, toggleTimezone } = useTimezone()
 
   if (!utcDate) {
     return <span className={className}>N/A</span>
@@ -37,7 +34,11 @@ export const TimeDisplay: React.FC<TimeDisplayProps> = ({
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <span>{formattedTime}</span>
       {showBadge && (
-        <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/30">
+        <span
+          onClick={toggleTimezone}
+          className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+          title="Click to toggle timezone"
+        >
           {offsetLabel}
         </span>
       )}
@@ -60,11 +61,7 @@ export const TimeDisplayWithTooltip: React.FC<TimeDisplayProps> = ({
   format = 'full',
   className = ''
 }) => {
-  const { offsetHours, offsetLabel, loading, timezone } = useTimezone()
-
-  if (loading) {
-    return <span className={className}>Loading...</span>
-  }
+  const { offsetHours, offsetLabel, toggleTimezone } = useTimezone()
 
   if (!utcDate) {
     return <span className={className}>N/A</span>
@@ -76,8 +73,9 @@ export const TimeDisplayWithTooltip: React.FC<TimeDisplayProps> = ({
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <span>{formattedTime}</span>
       <span
-        className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/30 cursor-help"
-        title={`${timezone} - ${offsetLabel}`}
+        onClick={toggleTimezone}
+        className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/30 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+        title={`Click to toggle timezone - ${offsetLabel}`}
       >
         {offsetLabel}
       </span>

@@ -401,7 +401,7 @@ export function DashboardTab() {
                     <p className="font-medium">{transaction.description || "Transaction"}</p>
                     <TimeDisplay
                       utcDate={transaction.created_at}
-                      format="relative"
+                      format="full"
                       showBadge={true}
                       className="text-xs text-muted-foreground"
                     />
