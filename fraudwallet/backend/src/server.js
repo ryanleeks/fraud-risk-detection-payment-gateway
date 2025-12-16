@@ -55,6 +55,13 @@ app.post('/api/user/2fa/send-disable-code', verifyToken, user.sendDisableCode);
 app.put('/api/user/2fa/method', verifyToken, user.update2FAMethod);
 app.post('/api/user/2fa/test', verifyToken, user.send2FATest);
 
+// Transaction passcode routes (protected)
+const passcodeAPI = require('./passcodeAPI');
+app.post('/api/user/passcode/set', verifyToken, passcodeAPI.setUserPasscode);
+app.post('/api/user/passcode/verify', verifyToken, passcodeAPI.verifyUserPasscode);
+app.post('/api/user/passcode/change', verifyToken, passcodeAPI.changeUserPasscode);
+app.get('/api/user/passcode/status', verifyToken, passcodeAPI.getUserPasscodeStatus);
+
 // Payment routes (protected)
 app.post('/api/payment/lookup-recipient', verifyToken, user.lookupRecipient);
 
