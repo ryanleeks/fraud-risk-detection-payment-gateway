@@ -129,6 +129,59 @@ const createPaymentIntent = async (req, res) => {
     // Use validated amount (already rounded to 2 decimals)
     const validatedAmount = validation.value;
 
+    // Get user context for fraud detection
+    const user = db.prepare('SELECT id, wallet_balance, created_at FROM users WHERE id = ?').get(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const ipAddress = getClientIP(req);
+
+    // 🔒 FRAUD DETECTION CHECK for Top-Up
+    const fraudCheck = await fraudDetection.analyzeFraudRisk({
+      userId: userId,
+      amount: validatedAmount,
+      type: 'deposit',
+      ipAddress: ipAddress
+    }, {
+      walletBalance: user.wallet_balance,
+      accountCreated: user.created_at
+    });
+
+    // Log fraud check result
+    console.log(`🔍 Fraud Check (Top-Up) - User ${userId}: Score ${fraudCheck.riskScore}/100 (${fraudCheck.riskLevel}) - Action: ${fraudCheck.action}`);
+
+    // Handle fraud detection result
+    if (fraudCheck.action === 'BLOCK') {
+      return res.status(403).json({
+        success: false,
+        message: 'Transaction blocked due to fraud risk',
+        fraudDetection: {
+          riskScore: fraudCheck.riskScore,
+          riskLevel: fraudCheck.riskLevel,
+          reason: fraudCheck.aiAnalysis?.reasoning || 'Multiple fraud indicators detected',
+          detectionMethod: fraudCheck.detectionMethod,
+          triggeredRules: fraudCheck.triggeredRules?.map(r => ({
+            name: r.ruleName,
+            description: r.description
+          })),
+          aiInsights: fraudCheck.aiAnalysis ? {
+            score: fraudCheck.aiAnalysis.riskScore,
+            confidence: fraudCheck.aiAnalysis.confidence,
+            redFlags: fraudCheck.aiAnalysis.redFlags
+          } : null
+        }
+      });
+    }
+
+    if (fraudCheck.action === 'REVIEW') {
+      // Flag for manual review but allow transaction
+      console.log(`⚠️  HIGH RISK TOP-UP - Flagged for review: User ${userId}, Amount: RM${validatedAmount.toFixed(2)}`);
+    }
+
     // Stripe requires amount in cents
     const amountInCents = Math.round(validatedAmount * 100);
 

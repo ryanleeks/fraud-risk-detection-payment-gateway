@@ -230,6 +230,16 @@ export function DashboardTab() {
           setLoading(false)
           return { success: false, message: data.message }
         }
+
+        // Handle fraud detection blocking
+        if (response.status === 403 && data.fraudDetection) {
+          const fraudInfo = data.fraudDetection
+          const errorMsg = `⚠️ Security Alert: ${data.message}\n\nRisk Level: ${fraudInfo.riskLevel}\nReason: ${fraudInfo.reason || 'Suspicious activity detected'}`
+          setError(errorMsg)
+          setLoading(false)
+          return { success: false, message: errorMsg }
+        }
+
         setError(data.message || "Failed to create payment intent")
         setLoading(false)
         return { success: false, message: data.message, locked: response.status === 429 }
