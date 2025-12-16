@@ -10,6 +10,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 import { PasscodeDialog } from "@/components/passcode-dialog"
 import { useRouter } from "next/navigation"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 export function SplitPayTab() {
   const router = useRouter()
@@ -509,8 +510,12 @@ export function SplitPayTab() {
                   </div>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    <span>{formatDateShort(split.created_at)}</span>
-                    <span className="text-xs">• {formatDateTime(split.created_at)}</span>
+                    <TimeDisplay
+                      utcDate={split.created_at}
+                      format="full"
+                      showBadge={true}
+                      className="text-xs"
+                    />
                   </div>
                 </div>
                 <div className="text-right">
@@ -588,13 +593,25 @@ export function SplitPayTab() {
                         {participant.responded_at && (
                           <div className="flex items-center gap-1">
                             <Check className="h-3 w-3" />
-                            <span>Responded: {formatDateTime(participant.responded_at)}</span>
+                            <span>Responded: </span>
+                            <TimeDisplay
+                              utcDate={participant.responded_at}
+                              format="full"
+                              showBadge={true}
+                              className="text-xs"
+                            />
                           </div>
                         )}
                         {participant.paid === 1 && participant.paid_at && (
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
-                            <span>Paid: {formatDateTime(participant.paid_at)}</span>
+                            <span>Paid: </span>
+                            <TimeDisplay
+                              utcDate={participant.paid_at}
+                              format="full"
+                              showBadge={true}
+                              className="text-xs"
+                            />
                           </div>
                         )}
                         {participant.status === 'pending' && (

@@ -65,6 +65,9 @@ app.get('/api/user/passcode/status', verifyToken, passcodeAPI.getUserPasscodeSta
 // Payment routes (protected)
 app.post('/api/payment/lookup-recipient', verifyToken, user.lookupRecipient);
 
+// Timezone route (protected)
+app.get('/api/user/timezone', verifyToken, user.getUserTimezone);
+
 // Split payment routes (protected)
 const splitpay = require('./splitpay');
 app.post('/api/splitpay/create', verifyToken, splitpay.createSplitPayment);

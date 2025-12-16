@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const db = require('./database');
 const { validatePhoneNumber, canChangePhone } = require('./validation');
 const { generateCode, storeCode, verifyCode, sendEmailCode, sendSMSCode } = require('./twofa');
+const { getLocationFromIP } = require('./fraud-detection/utils/geolocation');
 
 const SALT_ROUNDS = 10;
 
@@ -706,6 +707,81 @@ const lookupRecipient = (req, res) => {
   }
 };
 
+/**
+ * GET USER TIMEZONE
+ * Get user's timezone based on their IP address
+ */
+const getUserTimezone = (req, res) => {
+  try {
+    // Extract IP address from request
+    const getClientIP = (req) => {
+      return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+             req.headers['x-real-ip'] ||
+             req.connection?.remoteAddress ||
+             req.socket?.remoteAddress ||
+             req.ip ||
+             'unknown';
+    };
+
+    const ipAddress = getClientIP(req);
+    console.log(`🌍 Getting timezone for IP: ${ipAddress}`);
+
+    // Get location from IP
+    const location = getLocationFromIP(ipAddress);
+
+    // Default to UTC+8 (Malaysia) for localhost/local IPs
+    let timezone = 'Asia/Kuala_Lumpur';
+    let offsetHours = 8;
+
+    if (location.timezone && location.country !== 'Local') {
+      timezone = location.timezone;
+
+      // Calculate offset hours from timezone
+      try {
+        const date = new Date();
+        const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+        const localDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+        offsetHours = Math.round((localDate - utcDate) / (1000 * 60 * 60));
+      } catch (error) {
+        console.error('Error calculating timezone offset:', error);
+        offsetHours = 8; // Default to UTC+8
+      }
+    }
+
+    // Format offset string (e.g., "+08:00" or "-05:00")
+    const offsetSign = offsetHours >= 0 ? '+' : '';
+    const offsetString = `${offsetSign}${String(Math.abs(offsetHours)).padStart(2, '0')}:00`;
+
+    // Format offset label for display (e.g., "UTC+8" or "UTC-5")
+    const offsetLabel = `UTC${offsetSign}${Math.abs(offsetHours)}`;
+
+    res.status(200).json({
+      success: true,
+      timezone,
+      offset: offsetString,
+      offsetHours,
+      offsetLabel,
+      country: location.country,
+      city: location.city,
+      ipAddress
+    });
+
+    console.log(`✅ Timezone: ${timezone} (${offsetLabel})`);
+
+  } catch (error) {
+    console.error('❌ Get timezone error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting timezone',
+      // Default to UTC+8 on error
+      timezone: 'Asia/Kuala_Lumpur',
+      offset: '+08:00',
+      offsetHours: 8,
+      offsetLabel: 'UTC+8'
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -715,5 +791,6 @@ module.exports = {
   sendDisableCode,
   update2FAMethod,
   send2FATest,
-  lookupRecipient
+  lookupRecipient,
+  getUserTimezone
 };
