@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { User, Search, Shield, Ban, KeyRound, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 interface UserData {
   id: number
@@ -295,8 +296,24 @@ export function UserManagementTab() {
 
                     {/* User Details */}
                     <div className="text-xs text-muted-foreground space-y-1">
-                      <div>Created: {new Date(user.created_at).toLocaleString()}</div>
-                      <div>Updated: {new Date(user.updated_at).toLocaleString()}</div>
+                      <div className="flex items-center gap-2">
+                        <span>Created:</span>
+                        <TimeDisplay
+                          utcDate={user.created_at}
+                          format="full"
+                          showBadge={true}
+                          className="text-xs"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>Updated:</span>
+                        <TimeDisplay
+                          utcDate={user.updated_at}
+                          format="full"
+                          showBadge={true}
+                          className="text-xs"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

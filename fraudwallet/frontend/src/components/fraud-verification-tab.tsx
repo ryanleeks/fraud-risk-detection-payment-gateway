@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, CheckCircle, XCircle, Clock, ShieldCheck } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 interface FraudLog {
   id: number
@@ -243,9 +244,12 @@ export function FraudVerificationTab() {
                       )}
 
                       {/* Timestamp */}
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(log.created_at)}
-                      </p>
+                      <TimeDisplay
+                        utcDate={log.created_at}
+                        format="full"
+                        showBadge={true}
+                        className="text-xs text-muted-foreground"
+                      />
 
                       {/* Verification Buttons */}
                       <div className="flex gap-2 pt-2">
@@ -329,9 +333,12 @@ export function FraudVerificationTab() {
                       </div>
 
                       {/* Timestamp */}
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(log.created_at)}
-                      </p>
+                      <TimeDisplay
+                        utcDate={log.created_at}
+                        format="full"
+                        showBadge={true}
+                        className="text-xs text-muted-foreground"
+                      />
                     </div>
                   </Card>
                 ))
