@@ -7,6 +7,7 @@ import { Shield, LogOut, ClipboardCheck, BarChart3, Users } from "lucide-react"
 import { FraudVerificationTab } from "@/components/fraud-verification-tab"
 import { AcademicMetricsTab } from "@/components/academic-metrics-tab"
 import { UserManagementTab } from "@/components/user-management-tab"
+import { TimezoneProvider } from "@/contexts/TimezoneContext"
 
 export default function AdminPage() {
   const { isAuthenticated, isLoading, isAdmin, logout } = useAuth(true) // Require admin
@@ -30,71 +31,73 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted">
-      {/* Header */}
-      <div className="bg-background border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-muted-foreground">Super User Access</p>
+    <TimezoneProvider>
+      <div className="min-h-screen bg-muted">
+        {/* Header */}
+        <div className="bg-background border-b border-border">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-8 w-8 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+                  <p className="text-sm text-muted-foreground">Super User Access</p>
+                </div>
               </div>
+              <Button variant="outline" onClick={logout} size="sm">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
-            <Button variant="outline" onClick={logout} size="sm">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
 
-          {/* Tab Navigation */}
-          <div className="mt-4 flex gap-2 border-b border-border">
-            <button
-              onClick={() => setActiveTab("verification")}
-              className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
-                activeTab === "verification"
-                  ? "border-primary text-primary font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ClipboardCheck className="h-4 w-4" />
-              Verify Transactions
-            </button>
-            <button
-              onClick={() => setActiveTab("metrics")}
-              className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
-                activeTab === "metrics"
-                  ? "border-primary text-primary font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Academic Metrics
-            </button>
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
-                activeTab === "users"
-                  ? "border-primary text-primary font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Users className="h-4 w-4" />
-              User Management
-            </button>
+            {/* Tab Navigation */}
+            <div className="mt-4 flex gap-2 border-b border-border">
+              <button
+                onClick={() => setActiveTab("verification")}
+                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
+                  activeTab === "verification"
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                Verify Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab("metrics")}
+                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
+                  activeTab === "metrics"
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Academic Metrics
+              </button>
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
+                  activeTab === "users"
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                User Management
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="container mx-auto px-4 py-6">
+          <div className="bg-background rounded-lg shadow-lg overflow-hidden">
+            {activeTab === "verification" && <FraudVerificationTab />}
+            {activeTab === "metrics" && <AcademicMetricsTab />}
+            {activeTab === "users" && <UserManagementTab />}
           </div>
         </div>
       </div>
-
-      {/* Content */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="bg-background rounded-lg shadow-lg overflow-hidden">
-          {activeTab === "verification" && <FraudVerificationTab />}
-          {activeTab === "metrics" && <AcademicMetricsTab />}
-          {activeTab === "users" && <UserManagementTab />}
-        </div>
-      </div>
-    </div>
+    </TimezoneProvider>
   )
 }
