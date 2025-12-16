@@ -1,14 +1,11 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { TimezoneInfo, fetchUserTimezone, getDefaultTimezone } from '@/utils/timezone'
 
 interface TimezoneContextType {
-  timezone: string
   offsetHours: number
   offsetLabel: string
-  loading: boolean
-  refreshTimezone: () => Promise<void>
+  toggleTimezone: () => void
 }
 
 const TimezoneContext = createContext<TimezoneContextType | undefined>(undefined)
@@ -26,47 +23,33 @@ interface TimezoneProviderProps {
 }
 
 export const TimezoneProvider: React.FC<TimezoneProviderProps> = ({ children }) => {
-  const [timezoneInfo, setTimezoneInfo] = useState<TimezoneInfo>(getDefaultTimezone())
-  const [loading, setLoading] = useState(true)
+  // Default to UTC+8, toggle to UTC+0 when clicked
+  const [isUTC0, setIsUTC0] = useState(false)
 
-  const loadTimezone = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-
-      if (!token) {
-        // Not logged in, use default timezone
-        setTimezoneInfo(getDefaultTimezone())
-        return
-      }
-
-      const info = await fetchUserTimezone(token)
-      setTimezoneInfo(info)
-
-      console.log(`🌍 Timezone loaded: ${info.timezone} (${info.offsetLabel})`)
-    } catch (error) {
-      console.error('Failed to load timezone:', error)
-      setTimezoneInfo(getDefaultTimezone())
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Load timezone on mount
+  // Load preference from localStorage on mount
   useEffect(() => {
-    loadTimezone()
+    const saved = localStorage.getItem('timezonePreference')
+    if (saved === 'UTC+0') {
+      setIsUTC0(true)
+    }
   }, [])
 
-  const refreshTimezone = async () => {
-    await loadTimezone()
+  const toggleTimezone = () => {
+    setIsUTC0(prev => {
+      const newValue = !prev
+      // Save preference
+      localStorage.setItem('timezonePreference', newValue ? 'UTC+0' : 'UTC+8')
+      return newValue
+    })
   }
 
+  const offsetHours = isUTC0 ? 0 : 8
+  const offsetLabel = isUTC0 ? 'UTC+0' : 'UTC+8'
+
   const value: TimezoneContextType = {
-    timezone: timezoneInfo.timezone,
-    offsetHours: timezoneInfo.offsetHours,
-    offsetLabel: timezoneInfo.offsetLabel,
-    loading,
-    refreshTimezone
+    offsetHours,
+    offsetLabel,
+    toggleTimezone
   }
 
   return (

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, Heart } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 interface FraudLog {
   id: number
@@ -479,7 +480,12 @@ export function FraudDashboardTab() {
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                     <span>{user.blocked_count} blocked • {user.review_count} reviewed</span>
-                    <span>{formatDate(user.last_flagged)}</span>
+                    <TimeDisplay
+                      utcDate={user.last_flagged}
+                      format="full"
+                      showBadge={true}
+                      className="text-xs"
+                    />
                   </div>
                 </Card>
               ))}
@@ -515,7 +521,12 @@ export function FraudDashboardTab() {
                     <span className="text-sm font-bold">RM {log.amount.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{formatDate(log.created_at)}</span>
+                    <TimeDisplay
+                      utcDate={log.created_at}
+                      format="full"
+                      showBadge={true}
+                      className="text-xs text-muted-foreground"
+                    />
                     <span className={`px-2 py-0.5 rounded-full border ${getRiskLevelColor(log.risk_level)}`}>
                       Risk Score: {log.risk_score}
                     </span>
