@@ -15,6 +15,7 @@ try {
 }
 
 const fraudDetection = require('./fraud-detection');
+const { hasPasscode, verifyPasscode } = require('./passcode');
 
 // Amount validation constants
 const AMOUNT_LIMITS = {
@@ -87,7 +88,34 @@ const getWalletBalance = (req, res) => {
 const createPaymentIntent = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { amount } = req.body;
+    const { amount, passcode } = req.body;
+
+    // Check if user has passcode setup
+    if (!hasPasscode(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must set up a transaction passcode before adding funds',
+        requiresPasscodeSetup: true
+      });
+    }
+
+    // Verify passcode
+    if (!passcode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction passcode is required'
+      });
+    }
+
+    const passcodeVerification = await verifyPasscode(userId, passcode);
+    if (!passcodeVerification.success) {
+      return res.status(passcodeVerification.locked ? 429 : 401).json({
+        success: false,
+        message: passcodeVerification.message,
+        locked: passcodeVerification.locked,
+        remainingAttempts: passcodeVerification.remainingAttempts
+      });
+    }
 
     // Validate amount
     const validation = validateAmount(amount, { minTopup: true });
@@ -296,8 +324,35 @@ const getClientIP = (req) => {
 const sendMoney = async (req, res) => {
   try {
     const senderId = req.user.userId;
-    const { recipientId, amount, note } = req.body;
+    const { recipientId, amount, note, passcode } = req.body;
     const ipAddress = getClientIP(req);
+
+    // Check if user has passcode setup
+    if (!hasPasscode(senderId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must set up a transaction passcode before sending money',
+        requiresPasscodeSetup: true
+      });
+    }
+
+    // Verify passcode
+    if (!passcode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction passcode is required'
+      });
+    }
+
+    const passcodeVerification = await verifyPasscode(senderId, passcode);
+    if (!passcodeVerification.success) {
+      return res.status(passcodeVerification.locked ? 429 : 401).json({
+        success: false,
+        message: passcodeVerification.message,
+        locked: passcodeVerification.locked,
+        remainingAttempts: passcodeVerification.remainingAttempts
+      });
+    }
 
     // Validate recipient
     if (!recipientId) {

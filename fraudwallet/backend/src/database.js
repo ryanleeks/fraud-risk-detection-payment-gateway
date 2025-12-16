@@ -90,6 +90,21 @@ const createUsersTable = () => {
       db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
       console.log('✅ Added role column');
     }
+
+    if (!columnNames.includes('transaction_passcode')) {
+      db.exec("ALTER TABLE users ADD COLUMN transaction_passcode TEXT");
+      console.log('✅ Added transaction_passcode column');
+    }
+
+    if (!columnNames.includes('passcode_attempts')) {
+      db.exec("ALTER TABLE users ADD COLUMN passcode_attempts INTEGER DEFAULT 0");
+      console.log('✅ Added passcode_attempts column');
+    }
+
+    if (!columnNames.includes('passcode_locked_until')) {
+      db.exec("ALTER TABLE users ADD COLUMN passcode_locked_until DATETIME");
+      console.log('✅ Added passcode_locked_until column');
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }

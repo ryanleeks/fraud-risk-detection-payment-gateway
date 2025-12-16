@@ -1,5 +1,6 @@
 // Split payment management
 const db = require('./database');
+const { hasPasscode, verifyPasscode } = require('./passcode');
 
 /**
  * CREATE SPLIT PAYMENT
@@ -253,7 +254,34 @@ const respondToSplitPayment = async (req, res) => {
 const payMyShare = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { splitPaymentId } = req.body;
+    const { splitPaymentId, passcode } = req.body;
+
+    // Check if user has passcode setup
+    if (!hasPasscode(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must set up a transaction passcode before paying split bills',
+        requiresPasscodeSetup: true
+      });
+    }
+
+    // Verify passcode
+    if (!passcode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction passcode is required'
+      });
+    }
+
+    const passcodeVerification = await verifyPasscode(userId, passcode);
+    if (!passcodeVerification.success) {
+      return res.status(passcodeVerification.locked ? 429 : 401).json({
+        success: false,
+        message: passcodeVerification.message,
+        locked: passcodeVerification.locked,
+        remainingAttempts: passcodeVerification.remainingAttempts
+      });
+    }
 
     if (!splitPaymentId) {
       return res.status(400).json({

@@ -5,12 +5,14 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard } from "lucide-react"
+import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard, AlertCircle } from "lucide-react"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { validateAmount, formatAmount, AMOUNT_LIMITS } from "@/utils/amountValidation"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
+import { PasscodeDialog } from "@/components/passcode-dialog"
+import { useRouter } from "next/navigation"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
@@ -106,6 +108,7 @@ function StripePaymentForm({
 }
 
 export function DashboardTab() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [walletBalance, setWalletBalance] = useState<number>(0)
   const [transactions, setTransactions] = useState<any[]>([])
@@ -115,6 +118,8 @@ export function DashboardTab() {
   const [error, setError] = useState("")
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
+  const [showPasscodeDialog, setShowPasscodeDialog] = useState(false)
+  const [showPasscodeSetupAlert, setShowPasscodeSetupAlert] = useState(false)
 
   // Load wallet balance and transactions
   const loadWalletData = async () => {
@@ -172,7 +177,7 @@ export function DashboardTab() {
     loadWalletData()
   }, [])
 
-  // Handle add funds - Create payment intent
+  // Handle add funds button click - Show passcode dialog
   const handleAddFunds = async () => {
     // Validate amount
     const validation = validateAmount(amount, { minTopup: true })
@@ -182,7 +187,14 @@ export function DashboardTab() {
       return
     }
 
-    // Use the validated and rounded amount
+    // Show passcode dialog to verify before creating payment intent
+    setShowPasscodeDialog(true)
+  }
+
+  // Handle passcode verification and create payment intent
+  const handlePasscodeVerification = async (passcode: string) => {
+    // Validate amount again
+    const validation = validateAmount(amount, { minTopup: true })
     const validatedAmount = validation.value
 
     setLoading(true)
@@ -191,14 +203,17 @@ export function DashboardTab() {
     try {
       const token = localStorage.getItem("token")
 
-      // Create payment intent
+      // Create payment intent with passcode
       const response = await fetch("http://localhost:8080/api/wallet/add-funds", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: validatedAmount })
+        body: JSON.stringify({
+          amount: validatedAmount,
+          passcode
+        })
       })
 
       const data = await response.json()
@@ -207,14 +222,23 @@ export function DashboardTab() {
         // Store client secret to show Stripe payment form
         setClientSecret(data.clientSecret)
         setPaymentIntentId(data.paymentIntentId)
+        return { success: true }
       } else {
+        // Check if user needs to set up passcode
+        if (data.requiresPasscodeSetup) {
+          setShowPasscodeSetupAlert(true)
+          setLoading(false)
+          return { success: false, message: data.message }
+        }
         setError(data.message || "Failed to create payment intent")
+        setLoading(false)
+        return { success: false, message: data.message, locked: response.status === 429 }
       }
     } catch (err) {
       console.error("Add funds error:", err)
       setError("Unable to connect to server")
-    } finally {
       setLoading(false)
+      return { success: false, message: "Unable to connect to server" }
     }
   }
 
@@ -485,6 +509,53 @@ export function DashboardTab() {
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Passcode Dialog */}
+      <PasscodeDialog
+        open={showPasscodeDialog}
+        onOpenChange={setShowPasscodeDialog}
+        mode="verify"
+        onSubmit={handlePasscodeVerification}
+        title="Verify Transaction"
+        description={`Enter your passcode to add RM${amount || "0.00"} to your wallet`}
+      />
+
+      {/* Passcode Setup Alert */}
+      {showPasscodeSetupAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+              </div>
+              <h3 className="text-xl font-bold">Passcode Required</h3>
+            </div>
+
+            <p className="mb-6 text-sm text-muted-foreground">
+              You need to set up a transaction passcode before you can add funds. This adds an extra layer of security to your transactions.
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowPasscodeSetupAlert(false)
+                  router.push("/?tab=profile")
+                }}
+                className="flex-1"
+              >
+                Set Up Passcode
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasscodeSetupAlert(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}
