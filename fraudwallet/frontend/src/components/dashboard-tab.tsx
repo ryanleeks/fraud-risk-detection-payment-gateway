@@ -13,6 +13,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 import { PasscodeDialog } from "@/components/passcode-dialog"
 import { useRouter } from "next/navigation"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
@@ -398,8 +399,13 @@ export function DashboardTab() {
                   </div>
                   <div>
                     <p className="font-medium">{transaction.description || "Transaction"}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(transaction.created_at)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    <TimeDisplay
+                      utcDate={transaction.created_at}
+                      format="relative"
+                      showBadge={true}
+                      className="text-xs text-muted-foreground"
+                    />
+                    <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${
                       transaction.status === 'completed' ? 'bg-green-500/10 text-green-600' :
                       transaction.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' :
                       'bg-red-500/10 text-red-600'
