@@ -139,8 +139,20 @@ export function FraudEngineTab() {
   }
 
   const getRuleCount = (ruleId: string) => {
-    const rule = systemMetrics.topRules.find(r => r.ruleId === ruleId)
+    const rule = systemMetrics?.topRules?.find(r => r.ruleId === ruleId)
     return rule ? rule.count : 0
+  }
+
+  // Safe access helpers with defaults
+  const safeNum = (value: number | undefined, decimals = 0): string => {
+    return (value ?? 0).toFixed(decimals)
+  }
+
+  const safePercent = (numerator: number | undefined, denominator: number | undefined): string => {
+    const num = numerator ?? 0
+    const denom = denominator ?? 1
+    if (denom === 0) return "0.0"
+    return ((num / denom) * 100).toFixed(1)
   }
 
   return (
@@ -173,8 +185,8 @@ export function FraudEngineTab() {
               <Shield className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">AI Detection</p>
             </div>
-            <Badge variant={aiMetrics.aiEnabled ? "default" : "secondary"} className="text-sm">
-              {aiMetrics.aiEnabled ? "Enabled" : "Disabled"}
+            <Badge variant={aiMetrics?.aiEnabled ? "default" : "secondary"} className="text-sm">
+              {aiMetrics?.aiEnabled ? "Enabled" : "Disabled"}
             </Badge>
           </div>
 
@@ -183,7 +195,7 @@ export function FraudEngineTab() {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">AI Response Time</p>
             </div>
-            <p className="text-xl font-bold">{aiMetrics.avgResponseTime.toFixed(0)}ms</p>
+            <p className="text-xl font-bold">{safeNum(aiMetrics?.avgResponseTime)}ms</p>
           </div>
 
           <div>
@@ -191,7 +203,7 @@ export function FraudEngineTab() {
               <Zap className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Rule Response Time</p>
             </div>
-            <p className="text-xl font-bold">{systemMetrics.avgResponseTime.toFixed(0)}ms</p>
+            <p className="text-xl font-bold">{safeNum(systemMetrics?.avgResponseTime)}ms</p>
           </div>
 
           <div>
@@ -199,7 +211,7 @@ export function FraudEngineTab() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Total Checks (24h)</p>
             </div>
-            <p className="text-xl font-bold">{systemMetrics.totalChecks}</p>
+            <p className="text-xl font-bold">{systemMetrics?.totalChecks ?? 0}</p>
           </div>
         </div>
       </Card>
@@ -219,7 +231,7 @@ export function FraudEngineTab() {
         <div className="mb-6">
           <h4 className="font-semibold mb-3 text-sm">Most Triggered Rules</h4>
           <div className="space-y-2">
-            {systemMetrics.topRules.slice(0, 5).map((rule, idx) => {
+            {(systemMetrics?.topRules ?? []).slice(0, 5).map((rule, idx) => {
               // Find rule details
               const allRules = [...RULE_CATALOG.velocity, ...RULE_CATALOG.amount, ...RULE_CATALOG.behavioral]
               const ruleDetails = allRules.find(r => r.id === rule.ruleId)
@@ -420,33 +432,33 @@ export function FraudEngineTab() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card className="p-3 bg-green-50 dark:bg-green-950/20">
               <p className="text-xs text-muted-foreground mb-1">ALLOW</p>
-              <p className="text-2xl font-bold text-green-600">{systemMetrics.actionDistribution.allow}</p>
+              <p className="text-2xl font-bold text-green-600">{systemMetrics?.actionDistribution?.allow ?? 0}</p>
               <p className="text-xs text-muted-foreground">
-                {((systemMetrics.actionDistribution.allow / systemMetrics.totalChecks) * 100).toFixed(1)}%
+                {safePercent(systemMetrics?.actionDistribution?.allow, systemMetrics?.totalChecks)}%
               </p>
             </Card>
 
             <Card className="p-3 bg-yellow-50 dark:bg-yellow-950/20">
               <p className="text-xs text-muted-foreground mb-1">CHALLENGE</p>
-              <p className="text-2xl font-bold text-yellow-600">{systemMetrics.actionDistribution.challenge}</p>
+              <p className="text-2xl font-bold text-yellow-600">{systemMetrics?.actionDistribution?.challenge ?? 0}</p>
               <p className="text-xs text-muted-foreground">
-                {((systemMetrics.actionDistribution.challenge / systemMetrics.totalChecks) * 100).toFixed(1)}%
+                {safePercent(systemMetrics?.actionDistribution?.challenge, systemMetrics?.totalChecks)}%
               </p>
             </Card>
 
             <Card className="p-3 bg-orange-50 dark:bg-orange-950/20">
               <p className="text-xs text-muted-foreground mb-1">REVIEW</p>
-              <p className="text-2xl font-bold text-orange-600">{systemMetrics.actionDistribution.review}</p>
+              <p className="text-2xl font-bold text-orange-600">{systemMetrics?.actionDistribution?.review ?? 0}</p>
               <p className="text-xs text-muted-foreground">
-                {((systemMetrics.actionDistribution.review / systemMetrics.totalChecks) * 100).toFixed(1)}%
+                {safePercent(systemMetrics?.actionDistribution?.review, systemMetrics?.totalChecks)}%
               </p>
             </Card>
 
             <Card className="p-3 bg-red-50 dark:bg-red-950/20">
               <p className="text-xs text-muted-foreground mb-1">BLOCK</p>
-              <p className="text-2xl font-bold text-red-600">{systemMetrics.actionDistribution.block}</p>
+              <p className="text-2xl font-bold text-red-600">{systemMetrics?.actionDistribution?.block ?? 0}</p>
               <p className="text-xs text-muted-foreground">
-                {((systemMetrics.actionDistribution.block / systemMetrics.totalChecks) * 100).toFixed(1)}%
+                {safePercent(systemMetrics?.actionDistribution?.block, systemMetrics?.totalChecks)}%
               </p>
             </Card>
           </div>
@@ -487,7 +499,7 @@ export function FraudEngineTab() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">AI Confidence</p>
             </div>
-            <p className="text-3xl font-bold">{aiMetrics.avgConfidence.toFixed(1)}%</p>
+            <p className="text-3xl font-bold">{safeNum(aiMetrics?.avgConfidence, 1)}%</p>
             <p className="text-xs text-muted-foreground mt-1">Average confidence score</p>
           </Card>
 
@@ -496,7 +508,7 @@ export function FraudEngineTab() {
               <Shield className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">AI Risk Score</p>
             </div>
-            <p className="text-3xl font-bold">{aiMetrics.avgRiskScore.toFixed(1)}</p>
+            <p className="text-3xl font-bold">{safeNum(aiMetrics?.avgRiskScore, 1)}</p>
             <p className="text-xs text-muted-foreground mt-1">Average AI-assigned risk</p>
           </Card>
 
@@ -505,7 +517,7 @@ export function FraudEngineTab() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Total Analyses</p>
             </div>
-            <p className="text-3xl font-bold">{aiMetrics.totalAnalyses}</p>
+            <p className="text-3xl font-bold">{aiMetrics?.totalAnalyses ?? 0}</p>
             <p className="text-xs text-muted-foreground mt-1">AI fraud checks performed</p>
           </Card>
         </div>
@@ -514,7 +526,7 @@ export function FraudEngineTab() {
         <div className="mb-6">
           <h4 className="font-semibold mb-3 text-sm">Most Common AI-Identified Red Flags</h4>
           <div className="space-y-2">
-            {aiMetrics.topRedFlags.slice(0, 8).map((redFlag, idx) => (
+            {(aiMetrics?.topRedFlags ?? []).slice(0, 8).map((redFlag, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -533,7 +545,7 @@ export function FraudEngineTab() {
             <div className="space-y-2 text-sm">
               <p className="font-semibold">AI vs Rules</p>
               <p className="text-muted-foreground">
-                AI disagreement rate: <strong>{(aiMetrics.disagreementRate * 100).toFixed(1)}%</strong>
+                AI disagreement rate: <strong>{safeNum((aiMetrics?.disagreementRate ?? 0) * 100, 1)}%</strong>
               </p>
               <p className="text-xs text-muted-foreground">
                 The AI analyzes context that rules can't capture, such as complex patterns, user behavior anomalies,
