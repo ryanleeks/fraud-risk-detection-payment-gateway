@@ -41,7 +41,80 @@ const getUserFraudStats = async (req, res) => {
  */
 const getSystemMetrics = async (req, res) => {
   try {
-    const metrics = await fraudDetection.getSystemMetrics();
+    const rawMetrics = await fraudDetection.getSystemMetrics();
+
+    // Get action distribution
+    const actionDist = db.prepare(`
+      SELECT
+        action_taken,
+        COUNT(*) as count
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-24 hours')
+      GROUP BY action_taken
+    `).all();
+
+    const actionDistribution = {
+      allow: 0,
+      challenge: 0,
+      review: 0,
+      block: 0
+    };
+
+    actionDist.forEach(item => {
+      const action = item.action_taken.toLowerCase();
+      if (action in actionDistribution) {
+        actionDistribution[action] = item.count;
+      }
+    });
+
+    // Extract and count individual rules from triggered rules
+    const ruleStats = db.prepare(`
+      SELECT rules_triggered
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-7 days')
+      AND rules_triggered != '[]'
+    `).all();
+
+    const ruleCounts = {};
+    ruleStats.forEach(row => {
+      try {
+        const rules = JSON.parse(row.rules_triggered);
+        rules.forEach(ruleId => {
+          ruleCounts[ruleId] = (ruleCounts[ruleId] || 0) + 1;
+        });
+      } catch (e) {}
+    });
+
+    // Convert to array and sort
+    const topRules = Object.entries(ruleCounts)
+      .map(([ruleId, count]) => ({ ruleId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Transform to frontend-expected format
+    const metrics = {
+      totalChecks: rawMetrics.last24Hours?.total_checks || 0,
+      avgResponseTime: rawMetrics.last24Hours?.avg_execution_time || 0,
+      actionDistribution,
+      topRules,
+      riskDistribution: {
+        minimal: 0,
+        low: 0,
+        medium: 0,
+        high: 0,
+        critical: 0
+      }
+    };
+
+    // Map risk levels
+    if (rawMetrics.riskLevelDistribution) {
+      rawMetrics.riskLevelDistribution.forEach(item => {
+        const level = item.risk_level.toLowerCase();
+        if (level in metrics.riskDistribution) {
+          metrics.riskDistribution[level] = item.count;
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -289,6 +362,10 @@ const getAIFraudLogs = async (req, res) => {
  */
 const getAIMetrics = async (req, res) => {
   try {
+    // Check if AI is enabled
+    const geminiAI = require('./fraud-detection/geminiAI');
+    const aiEnabled = geminiAI.enabled || false;
+
     // Overall AI usage
     const aiUsage = db.prepare(`
       SELECT
@@ -300,47 +377,63 @@ const getAIMetrics = async (req, res) => {
         COUNT(CASE WHEN detection_method = 'rules' THEN 1 END) as rules_only_count
       FROM fraud_logs
       WHERE created_at > datetime('now', '-24 hours')
+      AND ai_risk_score IS NOT NULL
     `).get();
 
-    // AI vs Rules comparison
-    const comparison = db.prepare(`
-      SELECT
-        AVG(CASE WHEN detection_method = 'hybrid' THEN risk_score END) as avg_hybrid_score,
-        AVG(CASE WHEN detection_method = 'rules' THEN risk_score END) as avg_rules_score,
-        AVG(CASE WHEN detection_method = 'hybrid' THEN ABS(rule_based_score - ai_risk_score) END) as avg_score_difference
+    // Get top AI red flags
+    const redFlagsData = db.prepare(`
+      SELECT ai_red_flags
       FROM fraud_logs
       WHERE created_at > datetime('now', '-7 days')
+      AND ai_red_flags IS NOT NULL
+      AND ai_red_flags != '[]'
+    `).all();
+
+    const redFlagCounts = {};
+    redFlagsData.forEach(row => {
+      try {
+        const flags = JSON.parse(row.ai_red_flags);
+        flags.forEach(flag => {
+          redFlagCounts[flag] = (redFlagCounts[flag] || 0) + 1;
+        });
+      } catch (e) {}
+    });
+
+    const topRedFlags = Object.entries(redFlagCounts)
+      .map(([flag, count]) => ({ flag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Calculate disagreement rate
+    const disagreements = db.prepare(`
+      SELECT
+        COUNT(*) as total_hybrid,
+        COUNT(CASE WHEN ABS(rule_based_score - ai_risk_score) >= 20 THEN 1 END) as significant_disagreements
+      FROM fraud_logs
+      WHERE created_at > datetime('now', '-7 days')
+      AND detection_method = 'hybrid'
+      AND ai_risk_score IS NOT NULL
+      AND rule_based_score IS NOT NULL
     `).get();
 
-    // AI detection rate
-    const detectionStats = db.prepare(`
-      SELECT
-        detection_method,
-        action_taken,
-        COUNT(*) as count
-      FROM fraud_logs
-      WHERE created_at > datetime('now', '-24 hours')
-      GROUP BY detection_method, action_taken
-    `).all();
+    const disagreementRate = disagreements.total_hybrid > 0
+      ? disagreements.significant_disagreements / disagreements.total_hybrid
+      : 0;
+
+    // Transform to frontend-expected format
+    const metrics = {
+      aiEnabled,
+      totalAnalyses: aiUsage.total_ai_checks || 0,
+      avgConfidence: aiUsage.avg_confidence || 0,
+      avgRiskScore: aiUsage.avg_ai_score || 0,
+      avgResponseTime: aiUsage.avg_response_time || 0,
+      topRedFlags,
+      disagreementRate
+    };
 
     res.status(200).json({
       success: true,
-      metrics: {
-        usage: {
-          totalAIChecks: aiUsage.total_ai_checks || 0,
-          avgAIScore: aiUsage.avg_ai_score ? parseFloat(aiUsage.avg_ai_score.toFixed(2)) : 0,
-          avgConfidence: aiUsage.avg_confidence ? parseFloat(aiUsage.avg_confidence.toFixed(2)) : 0,
-          avgResponseTime: aiUsage.avg_response_time ? parseFloat(aiUsage.avg_response_time.toFixed(2)) : 0,
-          hybridCount: aiUsage.hybrid_count || 0,
-          rulesOnlyCount: aiUsage.rules_only_count || 0
-        },
-        comparison: {
-          avgHybridScore: comparison.avg_hybrid_score ? parseFloat(comparison.avg_hybrid_score.toFixed(2)) : 0,
-          avgRulesScore: comparison.avg_rules_score ? parseFloat(comparison.avg_rules_score.toFixed(2)) : 0,
-          avgScoreDifference: comparison.avg_score_difference ? parseFloat(comparison.avg_score_difference.toFixed(2)) : 0
-        },
-        detectionStats: detectionStats
-      }
+      metrics
     });
   } catch (error) {
     console.error('Get AI metrics error:', error);
