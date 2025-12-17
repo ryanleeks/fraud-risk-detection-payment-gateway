@@ -15,7 +15,11 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
-  BarChart3
+  BarChart3,
+  Cpu,
+  MemoryStick,
+  Database,
+  Wifi
 } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
@@ -82,9 +86,44 @@ interface AIMetrics {
   aiEnabled: boolean
 }
 
+interface SystemHealth {
+  cpu: {
+    usage: number
+    cores: number
+    model: string
+  }
+  memory: {
+    totalMB: number
+    usedMB: number
+    freeMB: number
+    usagePercent: number
+    process: {
+      heapUsedMB: number
+      heapTotalMB: number
+      rssMB: number
+    }
+  }
+  latency: {
+    api: number
+    database: number
+  }
+  connections: {
+    ai: {
+      status: string
+      latency: number
+    }
+    database: {
+      status: string
+    }
+  }
+  uptime: number
+  timestamp: string
+}
+
 export function FraudEngineTab() {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null)
   const [aiMetrics, setAIMetrics] = useState<AIMetrics | null>(null)
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedCategory, setExpandedCategory] = useState<string | null>("velocity")
 
@@ -102,12 +141,20 @@ export function FraudEngineTab() {
       const aiResponse = await fetch("http://localhost:8080/api/fraud/ai-metrics", { headers })
       const aiData = await aiResponse.json()
 
+      // Fetch system health
+      const healthResponse = await fetch("http://localhost:8080/api/fraud/system-health", { headers })
+      const healthData = await healthResponse.json()
+
       if (systemData.success) {
         setSystemMetrics(systemData.metrics)
       }
 
       if (aiData.success) {
         setAIMetrics(aiData.metrics)
+      }
+
+      if (healthData.success) {
+        setSystemHealth(healthData.health)
       }
     } catch (err) {
       console.error("Load metrics error:", err)
@@ -214,6 +261,65 @@ export function FraudEngineTab() {
             <p className="text-xl font-bold">{systemMetrics?.totalChecks ?? 0}</p>
           </div>
         </div>
+
+        {/* Resource Usage & Latency */}
+        {systemHealth && (
+          <div className="mt-6 pt-6 border-t">
+            <h4 className="font-semibold mb-4 text-sm">Resource Usage & Performance</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* CPU Usage */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Cpu className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">CPU Usage</p>
+                </div>
+                <p className="text-xl font-bold">{safeNum(systemHealth.cpu?.usage, 1)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">{systemHealth.cpu?.cores} cores</p>
+              </div>
+
+              {/* Memory Usage */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <MemoryStick className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Memory Usage</p>
+                </div>
+                <p className="text-xl font-bold">{safeNum(systemHealth.memory?.usagePercent, 1)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {systemHealth.memory?.usedMB}MB / {systemHealth.memory?.totalMB}MB
+                </p>
+              </div>
+
+              {/* Database Latency */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Database Latency</p>
+                </div>
+                <p className="text-xl font-bold">{systemHealth.latency?.database ?? 0}ms</p>
+                <Badge variant="outline" className="mt-1 text-xs">
+                  {systemHealth.connections?.database?.status}
+                </Badge>
+              </div>
+
+              {/* AI Connection */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Wifi className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">AI Connection</p>
+                </div>
+                <Badge
+                  variant={systemHealth.connections?.ai?.status === 'connected' ? "default" : "secondary"}
+                  className="text-sm"
+                >
+                  {systemHealth.connections?.ai?.status}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Uptime: {Math.floor((systemHealth.uptime ?? 0) / 60)}m
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Section 2: Rule Analytics & Catalog */}

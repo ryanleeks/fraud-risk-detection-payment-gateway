@@ -703,6 +703,102 @@ const exportDataset = async (req, res) => {
   }
 };
 
+/**
+ * Get system health metrics (CPU, memory, latency, connection status)
+ */
+const getSystemHealth = async (req, res) => {
+  try {
+    const os = require('os');
+    const startTime = Date.now();
+
+    // CPU Usage
+    const cpus = os.cpus();
+    const cpuUsage = cpus.reduce((acc, cpu) => {
+      const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
+      const idle = cpu.times.idle;
+      return acc + (1 - idle / total) * 100;
+    }, 0) / cpus.length;
+
+    // Memory Usage
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsagePercent = (usedMemory / totalMemory) * 100;
+
+    // Process Memory
+    const processMemory = process.memoryUsage();
+
+    // Database Latency - test query
+    const dbStartTime = Date.now();
+    db.prepare('SELECT 1').get();
+    const dbLatency = Date.now() - dbStartTime;
+
+    // Test AI Connection (Gemini)
+    let aiConnectionStatus = 'unknown';
+    let aiConnectionLatency = 0;
+    try {
+      const geminiAI = require('./fraud-detection/geminiAI');
+      if (geminiAI.enabled) {
+        aiConnectionStatus = 'connected';
+        // We can't easily test the actual connection without making a real API call
+        // so we just check if it's configured
+      } else {
+        aiConnectionStatus = 'disabled';
+      }
+    } catch (error) {
+      aiConnectionStatus = 'error';
+    }
+
+    // API Response Time (this endpoint itself)
+    const apiLatency = Date.now() - startTime;
+
+    const health = {
+      cpu: {
+        usage: parseFloat(cpuUsage.toFixed(2)),
+        cores: cpus.length,
+        model: cpus[0]?.model || 'Unknown'
+      },
+      memory: {
+        totalMB: Math.round(totalMemory / 1024 / 1024),
+        usedMB: Math.round(usedMemory / 1024 / 1024),
+        freeMB: Math.round(freeMemory / 1024 / 1024),
+        usagePercent: parseFloat(memoryUsagePercent.toFixed(2)),
+        process: {
+          heapUsedMB: Math.round(processMemory.heapUsed / 1024 / 1024),
+          heapTotalMB: Math.round(processMemory.heapTotal / 1024 / 1024),
+          rssMB: Math.round(processMemory.rss / 1024 / 1024)
+        }
+      },
+      latency: {
+        api: apiLatency,
+        database: dbLatency
+      },
+      connections: {
+        ai: {
+          status: aiConnectionStatus,
+          latency: aiConnectionLatency
+        },
+        database: {
+          status: 'connected' // If we got here, DB is connected
+        }
+      },
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString()
+    };
+
+    res.status(200).json({
+      success: true,
+      health
+    });
+  } catch (error) {
+    console.error('Get system health error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching system health'
+    });
+  }
+};
+
 module.exports = {
   getUserFraudStats,
   getSystemMetrics,
@@ -723,5 +819,7 @@ module.exports = {
   getMetricsHistory,
   getErrorAnalysis,
   getThresholdAnalysis,
-  exportDataset
+  exportDataset,
+  // System health
+  getSystemHealth
 };
