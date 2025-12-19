@@ -799,6 +799,210 @@ const getSystemHealth = async (req, res) => {
   }
 };
 
+/**
+ * Revoke auto-approved transaction (admin only)
+ */
+const revokeAutoApproval = async (req, res) => {
+  try {
+    const { logId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required for revoking auto-approval'
+      });
+    }
+
+    const adminId = req.user.userId;
+
+    const updatedLog = fraudLogger.revokeAutoApproval(
+      parseInt(logId),
+      adminId,
+      reason
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Auto-approval revoked successfully',
+      log: updatedLog
+    });
+  } catch (error) {
+    console.error('Revoke auto-approval error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error revoking auto-approval'
+    });
+  }
+};
+
+/**
+ * Submit fraud detection appeal (user endpoint)
+ */
+const submitAppeal = async (req, res) => {
+  try {
+    const { logId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required for submitting an appeal'
+      });
+    }
+
+    const userId = req.user.userId;
+
+    const appeal = fraudLogger.submitAppeal(
+      parseInt(logId),
+      userId,
+      reason
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Appeal submitted successfully',
+      appeal: appeal
+    });
+  } catch (error) {
+    console.error('Submit appeal error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error submitting appeal'
+    });
+  }
+};
+
+/**
+ * Get pending appeals for admin review
+ */
+const getPendingAppeals = async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    const appeals = fraudLogger.getPendingAppeals(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      count: appeals.length,
+      appeals: appeals
+    });
+  } catch (error) {
+    console.error('Get pending appeals error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching pending appeals'
+    });
+  }
+};
+
+/**
+ * Get user's own appeals
+ */
+const getUserAppeals = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { limit = 20 } = req.query;
+
+    const appeals = fraudLogger.getUserAppeals(userId, parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      count: appeals.length,
+      appeals: appeals
+    });
+  } catch (error) {
+    console.error('Get user appeals error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching appeals'
+    });
+  }
+};
+
+/**
+ * Resolve an appeal (admin only)
+ */
+const resolveAppeal = async (req, res) => {
+  try {
+    const { appealId } = req.params;
+    const { status, adminNotes } = req.body;
+
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status must be "approved" or "rejected"'
+      });
+    }
+
+    const adminId = req.user.userId;
+
+    const updatedAppeal = fraudLogger.resolveAppeal(
+      parseInt(appealId),
+      adminId,
+      status,
+      adminNotes || ''
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Appeal ${status} successfully`,
+      appeal: updatedAppeal
+    });
+  } catch (error) {
+    console.error('Resolve appeal error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error resolving appeal'
+    });
+  }
+};
+
+/**
+ * Get user's fraud flags (for user dashboard)
+ */
+const getUserFraudFlags = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { limit = 20 } = req.query;
+
+    const flags = fraudLogger.getUserFraudFlags(userId, parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      count: flags.length,
+      flags: flags
+    });
+  } catch (error) {
+    console.error('Get user fraud flags error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching fraud flags'
+    });
+  }
+};
+
+/**
+ * Trigger manual auto-approval job (admin only)
+ */
+const triggerAutoApproval = async (req, res) => {
+  try {
+    const result = fraudLogger.autoApprovePendingReviews();
+
+    res.status(200).json({
+      success: true,
+      message: 'Auto-approval job completed',
+      result: result
+    });
+  } catch (error) {
+    console.error('Trigger auto-approval error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error triggering auto-approval'
+    });
+  }
+};
+
 module.exports = {
   getUserFraudStats,
   getSystemMetrics,
@@ -821,5 +1025,14 @@ module.exports = {
   getThresholdAnalysis,
   exportDataset,
   // System health
-  getSystemHealth
+  getSystemHealth,
+  // Auto-approval endpoints
+  revokeAutoApproval,
+  triggerAutoApproval,
+  // Appeals endpoints
+  submitAppeal,
+  getPendingAppeals,
+  getUserAppeals,
+  resolveAppeal,
+  getUserFraudFlags
 };

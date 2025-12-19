@@ -3,16 +3,17 @@
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
-import { Shield, LogOut, ClipboardCheck, BarChart3, Users, Gauge } from "lucide-react"
+import { Shield, LogOut, ClipboardCheck, BarChart3, Users, Gauge, MessageSquare } from "lucide-react"
 import { FraudVerificationTab } from "@/components/fraud-verification-tab"
 import { AcademicMetricsTab } from "@/components/academic-metrics-tab"
 import { UserManagementTab } from "@/components/user-management-tab"
 import { FraudEngineTab } from "@/components/fraud-engine-tab"
+import { FraudAppealsTab } from "@/components/fraud-appeals-tab"
 import { TimezoneProvider } from "@/contexts/TimezoneContext"
 
 export default function AdminPage() {
   const { isAuthenticated, isLoading, isAdmin, logout } = useAuth(true) // Require admin
-  const [activeTab, setActiveTab] = useState<"verification" | "metrics" | "users" | "fraudEngine">("verification")
+  const [activeTab, setActiveTab] = useState<"verification" | "metrics" | "users" | "fraudEngine" | "appeals">("verification")
 
   // Show loading screen while checking authentication
   if (isLoading) {
@@ -87,6 +88,17 @@ export default function AdminPage() {
                 Fraud Engine
               </button>
               <button
+                onClick={() => setActiveTab("appeals")}
+                className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
+                  activeTab === "appeals"
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Appeals
+              </button>
+              <button
                 onClick={() => setActiveTab("users")}
                 className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-all ${
                   activeTab === "users"
@@ -107,6 +119,7 @@ export default function AdminPage() {
             {activeTab === "verification" && <FraudVerificationTab />}
             {activeTab === "metrics" && <AcademicMetricsTab />}
             {activeTab === "fraudEngine" && <FraudEngineTab />}
+            {activeTab === "appeals" && <FraudAppealsTab />}
             {activeTab === "users" && <UserManagementTab />}
           </div>
         </div>

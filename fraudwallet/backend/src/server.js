@@ -108,6 +108,17 @@ app.get('/api/fraud/error-analysis', verifyAdminToken, fraudAPI.getErrorAnalysis
 app.get('/api/fraud/threshold-analysis', verifyAdminToken, fraudAPI.getThresholdAnalysis);
 app.get('/api/fraud/export-dataset', verifyAdminToken, fraudAPI.exportDataset);
 
+// Auto-approval routes
+app.post('/api/fraud/revoke/:logId', verifyAdminToken, fraudAPI.revokeAutoApproval);
+app.post('/api/fraud/trigger-auto-approval', verifyAdminToken, fraudAPI.triggerAutoApproval);
+
+// Appeals routes
+app.post('/api/fraud/appeal/:logId', verifyToken, fraudAPI.submitAppeal);
+app.get('/api/fraud/appeals/pending', verifyAdminToken, fraudAPI.getPendingAppeals);
+app.get('/api/fraud/appeals/my-appeals', verifyToken, fraudAPI.getUserAppeals);
+app.post('/api/fraud/appeals/:appealId/resolve', verifyAdminToken, fraudAPI.resolveAppeal);
+app.get('/api/fraud/my-flags', verifyToken, fraudAPI.getUserFraudFlags);
+
 // Admin routes (Admin only)
 const adminAPI = require('./adminAPI');
 app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);
