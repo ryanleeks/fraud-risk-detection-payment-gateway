@@ -20,7 +20,10 @@ const logFraudCheck = async (transaction, fraudResult) => {
     // Extract location data if available
     const locationData = transaction.locationData || {};
 
-    // Insert fraud check log with AI and location data
+    // Extract recipient data if available
+    const recipientData = transaction.recipientData || {};
+
+    // Insert fraud check log with AI, location, and recipient data
     db.prepare(`
       INSERT INTO fraud_logs (
         user_id,
@@ -44,8 +47,11 @@ const logFraudCheck = async (transaction, fraudResult) => {
         latitude,
         longitude,
         location_changed,
+        recipient_id,
+        recipient_name,
+        recipient_account_id,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       transaction.userId,
       transaction.type,
@@ -67,7 +73,10 @@ const logFraudCheck = async (transaction, fraudResult) => {
       locationData.city || null,
       locationData.latitude || null,
       locationData.longitude || null,
-      locationData.locationChanged ? 1 : 0
+      locationData.locationChanged ? 1 : 0,
+      recipientData.id || null,
+      recipientData.name || null,
+      recipientData.accountId || null
     );
 
     // Log to console for real-time monitoring
@@ -333,6 +342,22 @@ const createFraudLogsTable = () => {
         db.exec("ALTER TABLE fraud_logs ADD COLUMN location_changed INTEGER DEFAULT 0");
         console.log('✅ Added location_changed column to fraud_logs');
       }
+
+      // Recipient/transaction party columns
+      if (!columnNames.includes('recipient_id')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN recipient_id INTEGER");
+        console.log('✅ Added recipient_id column to fraud_logs');
+      }
+
+      if (!columnNames.includes('recipient_name')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN recipient_name TEXT");
+        console.log('✅ Added recipient_name column to fraud_logs');
+      }
+
+      if (!columnNames.includes('recipient_account_id')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN recipient_account_id TEXT");
+        console.log('✅ Added recipient_account_id column to fraud_logs');
+      }
     } catch (error) {
       console.error('Error adding AI columns:', error.message);
     }
@@ -410,11 +435,15 @@ const getUnverifiedLogs = (limit = 50) => {
     return db.prepare(`
       SELECT
         fl.*,
-        u.full_name,
-        u.account_id,
-        u.email
+        u.full_name as sender_name,
+        u.account_id as sender_account_id,
+        u.email as sender_email,
+        recipient.full_name as recipient_name,
+        recipient.account_id as recipient_account_id,
+        recipient.email as recipient_email
       FROM fraud_logs fl
       JOIN users u ON fl.user_id = u.id
+      LEFT JOIN users recipient ON fl.recipient_id = recipient.id
       WHERE fl.ground_truth IS NULL
       ORDER BY fl.created_at DESC
       LIMIT ?
@@ -435,10 +464,15 @@ const getVerifiedLogs = (limit = 100) => {
     return db.prepare(`
       SELECT
         fl.*,
-        u.full_name,
-        u.account_id
+        u.full_name as sender_name,
+        u.account_id as sender_account_id,
+        u.email as sender_email,
+        recipient.full_name as recipient_name,
+        recipient.account_id as recipient_account_id,
+        recipient.email as recipient_email
       FROM fraud_logs fl
       JOIN users u ON fl.user_id = u.id
+      LEFT JOIN users recipient ON fl.recipient_id = recipient.id
       WHERE fl.ground_truth IS NOT NULL
       ORDER BY fl.verified_at DESC
       LIMIT ?
