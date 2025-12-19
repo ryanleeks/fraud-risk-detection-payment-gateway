@@ -507,15 +507,6 @@ const sendMoney = async (req, res) => {
       console.log(`⚠️  HIGH RISK TRANSACTION - Flagged for review: User ${senderId}, Amount: RM${validatedAmount.toFixed(2)}`);
     }
 
-    // Check recipient exists
-    const recipient = db.prepare('SELECT id, full_name, account_id FROM users WHERE id = ?').get(recipientId);
-    if (!recipient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Recipient not found'
-      });
-    }
-
     // Perform transfer in a transaction for atomicity
     const transfer = db.transaction(() => {
       // Deduct from sender
