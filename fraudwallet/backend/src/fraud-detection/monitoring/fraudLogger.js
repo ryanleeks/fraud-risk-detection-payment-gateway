@@ -358,9 +358,80 @@ const createFraudLogsTable = () => {
         db.exec("ALTER TABLE fraud_logs ADD COLUMN recipient_account_id TEXT");
         console.log('✅ Added recipient_account_id column to fraud_logs');
       }
+
+      // Auto-approval system columns
+      if (!columnNames.includes('auto_approved_at')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN auto_approved_at DATETIME");
+        console.log('✅ Added auto_approved_at column to fraud_logs');
+      }
+
+      if (!columnNames.includes('auto_approval_source')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN auto_approval_source TEXT");
+        console.log('✅ Added auto_approval_source column to fraud_logs');
+      }
+
+      if (!columnNames.includes('revoked_at')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN revoked_at DATETIME");
+        console.log('✅ Added revoked_at column to fraud_logs');
+      }
+
+      if (!columnNames.includes('revoked_by')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN revoked_by INTEGER");
+        console.log('✅ Added revoked_by column to fraud_logs');
+      }
+
+      if (!columnNames.includes('revoked_reason')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN revoked_reason TEXT");
+        console.log('✅ Added revoked_reason column to fraud_logs');
+      }
+
+      if (!columnNames.includes('appeal_status')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN appeal_status TEXT DEFAULT 'none'");
+        console.log('✅ Added appeal_status column to fraud_logs');
+      }
+
+      if (!columnNames.includes('appealed_at')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN appealed_at DATETIME");
+        console.log('✅ Added appealed_at column to fraud_logs');
+      }
     } catch (error) {
       console.error('Error adding AI columns:', error.message);
     }
+  } catch (error) {
+    // Table might already exist, that's okay
+  }
+};
+
+/**
+ * Create fraud_appeals table if it doesn't exist
+ */
+const createFraudAppealsTable = () => {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS fraud_appeals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fraud_log_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        resolved_at DATETIME,
+        resolved_by INTEGER,
+        admin_notes TEXT,
+        FOREIGN KEY (fraud_log_id) REFERENCES fraud_logs(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (resolved_by) REFERENCES users(id)
+      )
+    `);
+
+    // Create index for faster queries
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_fraud_appeals_user_id ON fraud_appeals(user_id);
+      CREATE INDEX IF NOT EXISTS idx_fraud_appeals_fraud_log_id ON fraud_appeals(fraud_log_id);
+      CREATE INDEX IF NOT EXISTS idx_fraud_appeals_status ON fraud_appeals(status);
+    `);
+
+    console.log('✅ Fraud appeals table is ready');
   } catch (error) {
     // Table might already exist, that's okay
   }
@@ -483,8 +554,310 @@ const getVerifiedLogs = (limit = 100) => {
   }
 };
 
-// Initialize table on module load
+/**
+ * Auto-approve idle fraud detections after 24 hours
+ * Only auto-approves REVIEW actions with LOW/MEDIUM/MINIMAL risk
+ * @returns {Object} Results of auto-approval operation
+ */
+const autoApprovePendingReviews = () => {
+  try {
+    // Find fraud logs eligible for auto-approval:
+    // - No ground truth set (still pending)
+    // - Created more than 24 hours ago
+    // - Action was REVIEW (not BLOCK)
+    // - Risk level is NOT HIGH or CRITICAL
+    const eligibleLogs = db.prepare(`
+      SELECT id, user_id, risk_score, risk_level, action_taken
+      FROM fraud_logs
+      WHERE ground_truth IS NULL
+      AND created_at < datetime('now', '-24 hours')
+      AND action_taken = 'REVIEW'
+      AND risk_level NOT IN ('HIGH', 'CRITICAL')
+    `).all();
+
+    if (eligibleLogs.length === 0) {
+      console.log('⏰ Auto-approval: No eligible logs found');
+      return { success: true, count: 0, logs: [] };
+    }
+
+    // Auto-approve each eligible log
+    const stmt = db.prepare(`
+      UPDATE fraud_logs
+      SET
+        ground_truth = 'legitimate',
+        auto_approved_at = CURRENT_TIMESTAMP,
+        auto_approval_source = 'auto_24hr',
+        verified_at = CURRENT_TIMESTAMP,
+        is_true_negative = 1
+      WHERE id = ?
+    `);
+
+    const approvedIds = [];
+    for (const log of eligibleLogs) {
+      stmt.run(log.id);
+      approvedIds.push(log.id);
+      console.log(`✅ Auto-approved fraud log ${log.id} (User: ${log.user_id}, Risk: ${log.risk_level})`);
+    }
+
+    console.log(`⏰ Auto-approval complete: ${approvedIds.length} logs approved`);
+
+    return {
+      success: true,
+      count: approvedIds.length,
+      logs: approvedIds
+    };
+  } catch (error) {
+    console.error('Auto-approval error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Revoke an auto-approved transaction back to fraud
+ * @param {number} logId - Fraud log ID
+ * @param {number} revokedBy - Admin user ID
+ * @param {string} reason - Reason for revocation
+ * @returns {Object} Updated log entry
+ */
+const revokeAutoApproval = (logId, revokedBy, reason) => {
+  try {
+    // Get the fraud log
+    const log = db.prepare('SELECT * FROM fraud_logs WHERE id = ?').get(logId);
+
+    if (!log) {
+      throw new Error('Fraud log not found');
+    }
+
+    // Update to fraud status with revocation details
+    db.prepare(`
+      UPDATE fraud_logs
+      SET
+        ground_truth = 'fraud',
+        revoked_at = CURRENT_TIMESTAMP,
+        revoked_by = ?,
+        revoked_reason = ?,
+        verified_at = CURRENT_TIMESTAMP,
+        verified_by = ?,
+        is_true_negative = 0,
+        is_true_positive = 1
+      WHERE id = ?
+    `).run(revokedBy, reason, revokedBy, logId);
+
+    console.log(`🚫 Revoked auto-approval for log ${logId} by admin ${revokedBy}`);
+
+    return db.prepare('SELECT * FROM fraud_logs WHERE id = ?').get(logId);
+  } catch (error) {
+    console.error('Revoke auto-approval error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Submit a fraud detection appeal
+ * @param {number} fraudLogId - Fraud log ID
+ * @param {number} userId - User ID submitting appeal
+ * @param {string} reason - Reason for appeal
+ * @returns {Object} Created appeal
+ */
+const submitAppeal = (fraudLogId, userId, reason) => {
+  try {
+    // Check if fraud log exists
+    const log = db.prepare('SELECT * FROM fraud_logs WHERE id = ?').get(fraudLogId);
+
+    if (!log) {
+      throw new Error('Fraud log not found');
+    }
+
+    // Verify user owns this fraud log
+    if (log.user_id !== userId) {
+      throw new Error('You can only appeal your own fraud detections');
+    }
+
+    // Create appeal
+    const result = db.prepare(`
+      INSERT INTO fraud_appeals (fraud_log_id, user_id, reason, status)
+      VALUES (?, ?, ?, 'pending')
+    `).run(fraudLogId, userId, reason);
+
+    // Update fraud log appeal status
+    db.prepare(`
+      UPDATE fraud_logs
+      SET
+        appeal_status = 'pending',
+        appealed_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(fraudLogId);
+
+    console.log(`📝 Appeal submitted for fraud log ${fraudLogId} by user ${userId}`);
+
+    return db.prepare('SELECT * FROM fraud_appeals WHERE id = ?').get(result.lastInsertRowid);
+  } catch (error) {
+    console.error('Submit appeal error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending appeals for admin review
+ * @param {number} limit - Number of appeals to return
+ * @returns {Array} Pending appeals
+ */
+const getPendingAppeals = (limit = 50) => {
+  try {
+    return db.prepare(`
+      SELECT
+        fa.*,
+        u.full_name as user_name,
+        u.account_id as user_account_id,
+        u.email as user_email,
+        fl.risk_score,
+        fl.risk_level,
+        fl.action_taken,
+        fl.amount,
+        fl.transaction_type,
+        fl.ground_truth,
+        fl.created_at as fraud_detected_at
+      FROM fraud_appeals fa
+      JOIN users u ON fa.user_id = u.id
+      JOIN fraud_logs fl ON fa.fraud_log_id = fl.id
+      WHERE fa.status = 'pending'
+      ORDER BY fa.created_at DESC
+      LIMIT ?
+    `).all(limit);
+  } catch (error) {
+    console.error('Get pending appeals error:', error);
+    return [];
+  }
+};
+
+/**
+ * Get all appeals for a specific user
+ * @param {number} userId - User ID
+ * @param {number} limit - Number of appeals to return
+ * @returns {Array} User's appeals
+ */
+const getUserAppeals = (userId, limit = 20) => {
+  try {
+    return db.prepare(`
+      SELECT
+        fa.*,
+        fl.risk_score,
+        fl.risk_level,
+        fl.action_taken,
+        fl.amount,
+        fl.transaction_type,
+        fl.ground_truth,
+        fl.created_at as fraud_detected_at,
+        admin.full_name as resolved_by_name
+      FROM fraud_appeals fa
+      JOIN fraud_logs fl ON fa.fraud_log_id = fl.id
+      LEFT JOIN users admin ON fa.resolved_by = admin.id
+      WHERE fa.user_id = ?
+      ORDER BY fa.created_at DESC
+      LIMIT ?
+    `).all(userId, limit);
+  } catch (error) {
+    console.error('Get user appeals error:', error);
+    return [];
+  }
+};
+
+/**
+ * Resolve an appeal (approve or reject)
+ * @param {number} appealId - Appeal ID
+ * @param {number} resolvedBy - Admin user ID
+ * @param {string} status - 'approved' or 'rejected'
+ * @param {string} adminNotes - Admin notes
+ * @returns {Object} Updated appeal
+ */
+const resolveAppeal = (appealId, resolvedBy, status, adminNotes) => {
+  try {
+    if (!['approved', 'rejected'].includes(status)) {
+      throw new Error('Status must be "approved" or "rejected"');
+    }
+
+    // Get appeal
+    const appeal = db.prepare('SELECT * FROM fraud_appeals WHERE id = ?').get(appealId);
+
+    if (!appeal) {
+      throw new Error('Appeal not found');
+    }
+
+    // Update appeal
+    db.prepare(`
+      UPDATE fraud_appeals
+      SET
+        status = ?,
+        resolved_at = CURRENT_TIMESTAMP,
+        resolved_by = ?,
+        admin_notes = ?
+      WHERE id = ?
+    `).run(status, resolvedBy, adminNotes, appealId);
+
+    // Update fraud log appeal status
+    db.prepare(`
+      UPDATE fraud_logs
+      SET appeal_status = ?
+      WHERE id = ?
+    `).run(status, appeal.fraud_log_id);
+
+    // If approved, update fraud log to legitimate
+    if (status === 'approved') {
+      db.prepare(`
+        UPDATE fraud_logs
+        SET
+          ground_truth = 'legitimate',
+          verified_at = CURRENT_TIMESTAMP,
+          verified_by = ?
+        WHERE id = ?
+      `).run(resolvedBy, appeal.fraud_log_id);
+
+      console.log(`✅ Appeal ${appealId} approved - fraud log ${appeal.fraud_log_id} marked legitimate`);
+    } else {
+      console.log(`❌ Appeal ${appealId} rejected`);
+    }
+
+    return db.prepare('SELECT * FROM fraud_appeals WHERE id = ?').get(appealId);
+  } catch (error) {
+    console.error('Resolve appeal error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's fraud flags (for user dashboard)
+ * @param {number} userId - User ID
+ * @param {number} limit - Number of flags to return
+ * @returns {Array} User's fraud flags
+ */
+const getUserFraudFlags = (userId, limit = 20) => {
+  try {
+    return db.prepare(`
+      SELECT
+        fl.*,
+        CASE
+          WHEN fl.ground_truth IS NULL AND fl.action_taken = 'REVIEW' THEN 'pending_review'
+          WHEN fl.ground_truth IS NULL AND fl.action_taken = 'BLOCK' THEN 'blocked'
+          WHEN fl.ground_truth = 'legitimate' AND fl.auto_approval_source = 'auto_24hr' THEN 'auto_approved'
+          WHEN fl.ground_truth = 'legitimate' THEN 'approved'
+          WHEN fl.ground_truth = 'fraud' THEN 'confirmed_fraud'
+          ELSE 'unknown'
+        END as status_label
+      FROM fraud_logs fl
+      WHERE fl.user_id = ?
+      AND (fl.action_taken IN ('REVIEW', 'BLOCK') OR fl.ground_truth IS NOT NULL)
+      ORDER BY fl.created_at DESC
+      LIMIT ?
+    `).all(userId, limit);
+  } catch (error) {
+    console.error('Get user fraud flags error:', error);
+    return [];
+  }
+};
+
+// Initialize tables on module load
 createFraudLogsTable();
+createFraudAppealsTable();
 
 module.exports = {
   logFraudCheck,
@@ -493,5 +866,14 @@ module.exports = {
   getRecentHighRiskTransactions,
   verifyGroundTruth,
   getUnverifiedLogs,
-  getVerifiedLogs
+  getVerifiedLogs,
+  // Auto-approval functions
+  autoApprovePendingReviews,
+  revokeAutoApproval,
+  // Appeals functions
+  submitAppeal,
+  getPendingAppeals,
+  getUserAppeals,
+  resolveAppeal,
+  getUserFraudFlags
 };

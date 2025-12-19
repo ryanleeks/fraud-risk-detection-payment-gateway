@@ -33,6 +33,12 @@ interface FraudLog {
   country?: string
   city?: string
   location_changed?: number
+  auto_approved_at?: string
+  auto_approval_source?: string
+  revoked_at?: string
+  revoked_by?: number
+  revoked_reason?: string
+  appeal_status?: string
 }
 
 export function FraudVerificationTab() {
@@ -41,6 +47,7 @@ export function FraudVerificationTab() {
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<"unverified" | "verified">("unverified")
   const [verifying, setVerifying] = useState<number | null>(null)
+  const [revoking, setRevoking] = useState<number | null>(null)
 
   const loadLogs = async () => {
     setLoading(true)
@@ -93,6 +100,39 @@ export function FraudVerificationTab() {
       alert("Failed to verify transaction")
     } finally {
       setVerifying(null)
+    }
+  }
+
+  const revokeLog = async (logId: number) => {
+    const reason = prompt("Please provide a reason for revoking this auto-approval:")
+    if (!reason || reason.trim().length === 0) {
+      return
+    }
+
+    setRevoking(logId)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://localhost:8080/api/fraud/revoke/${logId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Reload logs to update UI
+        await loadLogs()
+      } else {
+        alert(`Error: ${data.message}`)
+      }
+    } catch (err) {
+      console.error("Revoke log error:", err)
+      alert("Failed to revoke auto-approval")
+    } finally {
+      setRevoking(null)
     }
   }
 
@@ -360,6 +400,16 @@ export function FraudVerificationTab() {
                           >
                             {log.ground_truth === "fraud" ? "✓ Fraud" : "✓ Legitimate"}
                           </Badge>
+                          {log.auto_approval_source === "auto_24hr" && (
+                            <Badge variant="outline" className="px-2 py-1 text-xs bg-blue-50 border-blue-300">
+                              🤖 Auto-Approved
+                            </Badge>
+                          )}
+                          {log.revoked_at && (
+                            <Badge variant="destructive" className="px-2 py-1 text-xs">
+                              Revoked
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -415,6 +465,30 @@ export function FraudVerificationTab() {
                         showBadge={true}
                         className="text-xs text-muted-foreground"
                       />
+
+                      {/* Revoke Button (for auto-approved only) */}
+                      {log.auto_approval_source === "auto_24hr" && !log.revoked_at && (
+                        <div className="pt-2">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => revokeLog(log.id)}
+                            disabled={revoking === log.id}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Revoke Auto-Approval (Mark as Fraud)
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Revocation Info */}
+                      {log.revoked_at && log.revoked_reason && (
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                          <p className="text-sm font-medium text-red-900 mb-1">Revocation Reason:</p>
+                          <p className="text-sm text-red-700">{log.revoked_reason}</p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 ))
