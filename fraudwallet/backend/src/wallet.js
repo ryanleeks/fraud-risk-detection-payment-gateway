@@ -435,11 +435,20 @@ const sendMoney = async (req, res) => {
     }
 
     // Check sender exists and has sufficient balance
-    const sender = db.prepare('SELECT id, wallet_balance, full_name, created_at FROM users WHERE id = ?').get(senderId);
+    const sender = db.prepare('SELECT id, wallet_balance, full_name, account_id, created_at FROM users WHERE id = ?').get(senderId);
     if (!sender) {
       return res.status(404).json({
         success: false,
         message: 'Sender not found'
+      });
+    }
+
+    // Check recipient exists
+    const recipient = db.prepare('SELECT id, full_name, account_id FROM users WHERE id = ?').get(recipientId);
+    if (!recipient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Recipient not found'
       });
     }
 
@@ -456,7 +465,12 @@ const sendMoney = async (req, res) => {
       amount: validatedAmount,
       type: 'transfer_sent',
       recipientId: recipientId,
-      ipAddress: ipAddress
+      ipAddress: ipAddress,
+      recipientData: {
+        id: recipient.id,
+        name: recipient.full_name,
+        accountId: recipient.account_id
+      }
     }, {
       walletBalance: sender.wallet_balance,
       accountCreated: sender.created_at
