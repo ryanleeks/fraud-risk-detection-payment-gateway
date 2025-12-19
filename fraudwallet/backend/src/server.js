@@ -84,6 +84,7 @@ app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 
 // Fraud Detection routes (protected)
 const fraudAPI = require('./fraudDetectionAPI');
+app.get('/api/fraud/user-dashboard', verifyToken, fraudAPI.getUserDashboardMetrics);
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
 app.get('/api/fraud/system-health', verifyToken, fraudAPI.getSystemHealth);

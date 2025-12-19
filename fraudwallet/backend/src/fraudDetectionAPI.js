@@ -7,6 +7,60 @@ const academicMetrics = require('./fraud-detection/monitoring/academicMetrics');
 const db = require('./database');
 
 /**
+ * Get dashboard metrics for current user
+ * Returns: scannedTotal, blocked, highRisk, appeals
+ */
+const getUserDashboardMetrics = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get scanned total (all fraud logs for user)
+    const scannedTotal = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM fraud_logs
+      WHERE user_id = ?
+    `).get(userId);
+
+    // Get blocked transactions
+    const blocked = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM fraud_logs
+      WHERE user_id = ? AND action_taken = 'BLOCK'
+    `).get(userId);
+
+    // Get high risk transactions (high + critical)
+    const highRisk = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM fraud_logs
+      WHERE user_id = ? AND risk_level IN ('high', 'critical')
+    `).get(userId);
+
+    // Get pending appeals
+    const appeals = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM fraud_appeals
+      WHERE user_id = ? AND status = 'pending'
+    `).get(userId);
+
+    res.status(200).json({
+      success: true,
+      metrics: {
+        scannedTotal: scannedTotal.count || 0,
+        blocked: blocked.count || 0,
+        highRisk: highRisk.count || 0,
+        appeals: appeals.count || 0
+      }
+    });
+  } catch (error) {
+    console.error('Get dashboard metrics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard metrics'
+    });
+  }
+};
+
+/**
  * Get fraud detection statistics for current user
  */
 const getUserFraudStats = async (req, res) => {
@@ -1004,6 +1058,7 @@ const triggerAutoApproval = async (req, res) => {
 };
 
 module.exports = {
+  getUserDashboardMetrics,
   getUserFraudStats,
   getSystemMetrics,
   getRecentFraudLogs,

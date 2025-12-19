@@ -3,10 +3,17 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, Heart } from "lucide-react"
+import { AlertTriangle, Shield, Activity, TrendingUp, Users, AlertCircle, CheckCircle, XCircle, Heart, FileQuestion } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
 import { TimeDisplay } from "@/components/TimeDisplay"
+
+interface DashboardMetrics {
+  scannedTotal: number
+  blocked: number
+  highRisk: number
+  appeals: number
+}
 
 interface FraudLog {
   id: number
@@ -53,19 +60,34 @@ interface TopFlaggedUser {
 }
 
 export function FraudDashboardTab() {
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null)
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null)
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [highRiskUsers, setHighRiskUsers] = useState<FraudLog[]>([])
   const [topFlaggedUsers, setTopFlaggedUsers] = useState<TopFlaggedUser[]>([])
   const [recentLogs, setRecentLogs] = useState<FraudLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState<"overview" | "high-risk" | "flagged" | "recent">("overview")
+  const [activeView, setActiveView] = useState<"dashboard" | "scanned" | "blocked" | "highRisk" | "appeals" | "overview" | "high-risk" | "flagged" | "recent">("dashboard")
 
   const loadFraudData = async () => {
     setLoading(true)
     try {
       const token = localStorage.getItem("token")
       const headers = { "Authorization": `Bearer ${token}` }
+
+      // Fetch dashboard metrics
+      const dashboardResponse = await fetch("http://localhost:8080/api/fraud/user-dashboard", { headers })
+      const dashboardData = await dashboardResponse.json()
+      if (dashboardData.success && dashboardData.metrics) {
+        setDashboardMetrics(dashboardData.metrics)
+      } else {
+        setDashboardMetrics({
+          scannedTotal: 0,
+          blocked: 0,
+          highRisk: 0,
+          appeals: 0
+        })
+      }
 
       // Fetch user's personal stats
       const userStatsResponse = await fetch("http://localhost:8080/api/fraud/user-stats", { headers })
@@ -130,6 +152,12 @@ export function FraudDashboardTab() {
     } catch (err) {
       console.error("Load fraud data error:", err)
       // Reset to safe defaults on error
+      setDashboardMetrics({
+        scannedTotal: 0,
+        blocked: 0,
+        highRisk: 0,
+        appeals: 0
+      })
       setUserStats({
         total_checks: 0,
         avg_risk_score: 0,
@@ -250,6 +278,81 @@ export function FraudDashboardTab() {
             <p className="text-sm text-muted-foreground">Track your wallet's fraud risks and patterns</p>
           </div>
         </div>
+
+        {/* Dashboard Metrics */}
+        {activeView === "dashboard" && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Scanned Total Card */}
+              <Card
+                className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setActiveView("scanned")}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Scanned Total</p>
+                    <p className="text-3xl font-bold text-blue-600">{dashboardMetrics?.scannedTotal || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">All logs</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10">
+                    <Shield className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Blocked Card */}
+              <Card
+                className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setActiveView("blocked")}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Blocked</p>
+                    <p className="text-3xl font-bold text-red-600">{dashboardMetrics?.blocked || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Transactions</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </Card>
+
+              {/* High Risk Card */}
+              <Card
+                className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setActiveView("highRisk")}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">High Risk</p>
+                    <p className="text-3xl font-bold text-orange-600">{dashboardMetrics?.highRisk || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Transactions</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10">
+                    <AlertTriangle className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Appeals Card */}
+              <Card
+                className="p-4 cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setActiveView("appeals")}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Appeals</p>
+                    <p className="text-3xl font-bold text-purple-600">{dashboardMetrics?.appeals || 0}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Under review</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/10">
+                    <FileQuestion className="h-6 w-6 text-purple-600" />
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </>
+        )}
 
         {/* Overview Cards */}
         {activeView === "overview" && (
@@ -535,6 +638,160 @@ export function FraudDashboardTab() {
               ))}
             </div>
           )}
+          </div>
+        )}
+
+        {/* Scanned Total View - All Logs */}
+        {activeView === "scanned" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">All Scanned Transactions</h2>
+              <Button onClick={() => setActiveView("dashboard")} variant="ghost" size="sm">
+                ← Back to Dashboard
+              </Button>
+            </div>
+
+            {!recentLogs || recentLogs.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <Shield className="h-12 w-12 mx-auto mb-2 opacity-50 text-blue-600" />
+                <p>No transactions scanned yet</p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {recentLogs.map((log) => (
+                  <Card key={log.id} className="p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action_taken)}
+                        <span className="text-sm font-medium">{log.transaction_type}</span>
+                      </div>
+                      <span className="text-sm font-bold">RM {log.amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <TimeDisplay
+                        utcDate={log.created_at}
+                        format="full"
+                        showBadge={true}
+                        className="text-xs text-muted-foreground"
+                      />
+                      <span className={`px-2 py-0.5 rounded-full border ${getRiskLevelColor(log.risk_level)}`}>
+                        Risk Score: {log.risk_score}
+                      </span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Blocked Transactions View */}
+        {activeView === "blocked" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Blocked Transactions</h2>
+              <Button onClick={() => setActiveView("dashboard")} variant="ghost" size="sm">
+                ← Back to Dashboard
+              </Button>
+            </div>
+
+            {recentLogs.filter(log => log.action_taken.toLowerCase() === 'block').length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50 text-green-600" />
+                <p>No blocked transactions</p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {recentLogs
+                  .filter(log => log.action_taken.toLowerCase() === 'block')
+                  .map((log) => (
+                    <Card key={log.id} className="p-3 border-red-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <XCircle className="h-4 w-4 text-red-600" />
+                          <span className="text-sm font-medium">{log.transaction_type}</span>
+                        </div>
+                        <span className="text-sm font-bold">RM {log.amount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <TimeDisplay
+                          utcDate={log.created_at}
+                          format="full"
+                          showBadge={true}
+                          className="text-xs text-muted-foreground"
+                        />
+                        <span className={`px-2 py-0.5 rounded-full border ${getRiskLevelColor(log.risk_level)}`}>
+                          Risk Score: {log.risk_score}
+                        </span>
+                      </div>
+                    </Card>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* High Risk Transactions View */}
+        {activeView === "highRisk" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">High Risk Transactions</h2>
+              <Button onClick={() => setActiveView("dashboard")} variant="ghost" size="sm">
+                ← Back to Dashboard
+              </Button>
+            </div>
+
+            {recentLogs.filter(log => ['high', 'critical'].includes(log.risk_level.toLowerCase())).length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50 text-green-600" />
+                <p>No high risk transactions</p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {recentLogs
+                  .filter(log => ['high', 'critical'].includes(log.risk_level.toLowerCase()))
+                  .map((log) => (
+                    <Card key={log.id} className="p-3 border-orange-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-orange-600" />
+                          <span className="text-sm font-medium">{log.transaction_type}</span>
+                        </div>
+                        <span className="text-sm font-bold">RM {log.amount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <TimeDisplay
+                          utcDate={log.created_at}
+                          format="full"
+                          showBadge={true}
+                          className="text-xs text-muted-foreground"
+                        />
+                        <span className={`px-2 py-0.5 rounded-full border ${getRiskLevelColor(log.risk_level)}`}>
+                          Risk Score: {log.risk_score}
+                        </span>
+                      </div>
+                    </Card>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Appeals View */}
+        {activeView === "appeals" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Transactions Under Appeal</h2>
+              <Button onClick={() => setActiveView("dashboard")} variant="ghost" size="sm">
+                ← Back to Dashboard
+              </Button>
+            </div>
+
+            <Card className="p-6 text-center text-muted-foreground">
+              <FileQuestion className="h-12 w-12 mx-auto mb-2 opacity-50 text-purple-600" />
+              <p className="text-sm">Appeals feature coming soon</p>
+              <p className="text-xs mt-1">You'll be able to view and manage your appeals here</p>
+            </Card>
           </div>
         )}
       </div>
