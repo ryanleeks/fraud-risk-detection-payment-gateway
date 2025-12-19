@@ -12,9 +12,14 @@ import { TimeDisplay } from "@/components/TimeDisplay"
 interface FraudLog {
   id: number
   user_id: number
-  full_name: string
-  account_id: string
-  email: string
+  risk_score: number
+  risk_level: string
+  sender_name: string
+  sender_account_id: string
+  sender_email: string
+  recipient_name?: string
+  recipient_account_id?: string
+  recipient_email?: string
   transaction_type: string
   amount: number
   ai_risk_score: number
@@ -104,11 +109,20 @@ export function FraudVerificationTab() {
     return new Date(dateString).toLocaleString()
   }
 
-  const getRiskColor = (score: number) => {
-    if (score >= 80) return "text-red-600"
-    if (score >= 60) return "text-orange-600"
-    if (score >= 40) return "text-yellow-600"
-    return "text-green-600"
+  const getRiskLevel = (score: number): string => {
+    if (score >= 80) return "CRITICAL"
+    if (score >= 60) return "HIGH"
+    if (score >= 40) return "MEDIUM"
+    if (score >= 20) return "LOW"
+    return "MINIMAL"
+  }
+
+  const getRiskBadgeClasses = (score: number): string => {
+    if (score >= 80) return "bg-red-600 text-white hover:bg-red-700"
+    if (score >= 60) return "bg-orange-600 text-white hover:bg-orange-700"
+    if (score >= 40) return "bg-yellow-500 text-gray-900 hover:bg-yellow-600"
+    if (score >= 20) return "bg-green-400 text-gray-900 hover:bg-green-500"
+    return "bg-green-600 text-white hover:bg-green-700"
   }
 
   return (
@@ -169,17 +183,35 @@ export function FraudVerificationTab() {
                 unverifiedLogs.map((log) => (
                   <Card key={log.id} className="p-4">
                     <div className="space-y-3">
-                      {/* Header */}
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold">{log.full_name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {log.account_id} • {log.email}
-                          </p>
+                      {/* Header with Risk Badge */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="mb-2">
+                            <p className="text-xs text-muted-foreground mb-1">Transaction Parties</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-muted-foreground">From:</span>
+                                <span className="font-semibold">{log.sender_name}</span>
+                                <span className="text-xs text-muted-foreground">({log.sender_account_id})</span>
+                              </div>
+                              {log.recipient_name && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-muted-foreground">To:</span>
+                                  <span className="font-semibold">{log.recipient_name}</span>
+                                  <span className="text-xs text-muted-foreground">({log.recipient_account_id})</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <Badge className={getRiskColor(log.ai_risk_score)}>
-                          {log.ai_risk_score}/100
-                        </Badge>
+                        <div className="flex flex-col gap-2 items-end">
+                          <Badge className={`${getRiskBadgeClasses(log.risk_score)} px-3 py-1`}>
+                            <div className="text-center">
+                              <div className="text-xs font-semibold">{getRiskLevel(log.risk_score)}</div>
+                              <div className="text-lg font-bold">{log.risk_score}/100</div>
+                            </div>
+                          </Badge>
+                        </div>
                       </div>
 
                       {/* Transaction Details */}
@@ -295,22 +327,38 @@ export function FraudVerificationTab() {
                 verifiedLogs.map((log) => (
                   <Card key={log.id} className="p-4">
                     <div className="space-y-3">
-                      {/* Header with Ground Truth */}
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold">{log.full_name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {log.account_id}
-                          </p>
+                      {/* Header with Risk Badge and Ground Truth */}
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="mb-2">
+                            <p className="text-xs text-muted-foreground mb-1">Transaction Parties</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-muted-foreground">From:</span>
+                                <span className="font-semibold">{log.sender_name}</span>
+                                <span className="text-xs text-muted-foreground">({log.sender_account_id})</span>
+                              </div>
+                              {log.recipient_name && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-muted-foreground">To:</span>
+                                  <span className="font-semibold">{log.recipient_name}</span>
+                                  <span className="text-xs text-muted-foreground">({log.recipient_account_id})</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <Badge className={getRiskColor(log.ai_risk_score)}>
-                            AI: {log.ai_risk_score}/100
+                        <div className="flex flex-col gap-2 items-end">
+                          <Badge className={`${getRiskBadgeClasses(log.risk_score)} px-3 py-1`}>
+                            <div className="text-center">
+                              <div className="text-xs font-semibold">{getRiskLevel(log.risk_score)}</div>
+                              <div className="text-lg font-bold">{log.risk_score}/100</div>
+                            </div>
                           </Badge>
                           <Badge
-                            className={`mt-1 ${log.ground_truth === "fraud" ? "bg-red-500" : "bg-green-500"}`}
+                            className={`${log.ground_truth === "fraud" ? "bg-red-600 text-white hover:bg-red-700" : "bg-green-600 text-white hover:bg-green-700"} px-3 py-1`}
                           >
-                            {log.ground_truth === "fraud" ? "Fraud" : "Legitimate"}
+                            {log.ground_truth === "fraud" ? "✓ Fraud" : "✓ Legitimate"}
                           </Badge>
                         </div>
                       </div>
@@ -322,9 +370,37 @@ export function FraudVerificationTab() {
                           <span className="ml-2 font-medium">RM{log.amount.toFixed(2)}</span>
                         </div>
                         <div>
+                          <span className="text-muted-foreground">Type:</span>
+                          <span className="ml-2 font-medium">{log.transaction_type}</span>
+                        </div>
+                        <div>
                           <span className="text-muted-foreground">Action:</span>
                           <span className="ml-2 font-medium">{log.action_taken}</span>
                         </div>
+                        <div>
+                          <span className="text-muted-foreground">AI Confidence:</span>
+                          <span className="ml-2 font-medium">{log.ai_confidence}%</span>
+                        </div>
+                        {log.ip_address && (
+                          <>
+                            <div>
+                              <span className="text-muted-foreground">IP Address:</span>
+                              <span className="ml-2 font-medium font-mono text-xs">{log.ip_address}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Location:</span>
+                              <span className="ml-2 font-medium">
+                                {log.city}, {log.country}
+                                {log.location_changed === 1 && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Location Changed
+                                  </Badge>
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* AI Reasoning */}
