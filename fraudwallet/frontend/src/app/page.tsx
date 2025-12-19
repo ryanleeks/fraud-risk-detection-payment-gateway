@@ -5,7 +5,7 @@ import { DashboardTab } from "@/components/dashboard-tab"
 import { PaymentTab } from "@/components/payment-tab"
 import { SplitPayTab } from "@/components/splitpay-tab"
 import { ProfileTab } from "@/components/profile-tab"
-import { MyFraudAlertsTab } from "@/components/my-fraud-alerts-tab"
+import { FraudDashboardTab } from "@/components/fraud-dashboard-tab"
 import { Home, Send, Users, User, Shield } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { TimezoneProvider } from "@/contexts/TimezoneContext"
@@ -53,7 +53,7 @@ export default function WalletApp() {
             {activeTab === "dashboard" && <DashboardTab />}
             {activeTab === "payment" && <PaymentTab />}
             {activeTab === "splitpay" && <SplitPayTab />}
-            {activeTab === "fraud" && <MyFraudAlertsTab />}
+            {activeTab === "fraud" && <FraudDashboardTab />}
             {activeTab === "profile" && <ProfileTab />}
           </div>
 
