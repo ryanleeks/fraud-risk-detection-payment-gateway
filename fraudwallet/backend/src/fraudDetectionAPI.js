@@ -25,14 +25,14 @@ const getUserDashboardMetrics = async (req, res) => {
     const blocked = db.prepare(`
       SELECT COUNT(*) as count
       FROM fraud_logs
-      WHERE user_id = ? AND action_taken = 'BLOCK'
+      WHERE user_id = ? AND UPPER(action_taken) = 'BLOCK'
     `).get(userId);
 
     // Get high risk transactions (high + critical)
     const highRisk = db.prepare(`
       SELECT COUNT(*) as count
       FROM fraud_logs
-      WHERE user_id = ? AND risk_level IN ('high', 'critical')
+      WHERE user_id = ? AND UPPER(risk_level) IN ('HIGH', 'CRITICAL')
     `).get(userId);
 
     // Get pending appeals
