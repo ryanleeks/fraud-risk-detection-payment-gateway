@@ -212,6 +212,32 @@ export function FraudDashboardTab() {
     )
   }
 
+  // Calculate weekly stats from recent logs
+  const getWeeklyStats = () => {
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const weeklyLogs = recentLogs.filter(log => {
+      const logDate = new Date(log.created_at)
+      return logDate >= sevenDaysAgo
+    })
+
+    const blocked = weeklyLogs.filter(log => log.action_taken.toLowerCase() === 'block').length
+    const highRisk = weeklyLogs.filter(log => ['high', 'critical'].includes(log.risk_level.toLowerCase())).length
+    const total = weeklyLogs.length
+
+    return { total, blocked, highRisk }
+  }
+
+  // Check if risk score is trending up (alert condition)
+  const isRiskTrendingUp = () => {
+    const avgScore = userStats?.avg_risk_score || 0
+    const maxScore = userStats?.max_risk_score || 0
+
+    // Alert if average is high or if max score is significantly higher than average
+    return avgScore >= 60 || (maxScore - avgScore) >= 30
+  }
+
   const loadFraudData = async () => {
     setLoading(true)
     try {
@@ -451,9 +477,18 @@ export function FraudDashboardTab() {
                     <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`} />
                     <h3 className="font-semibold">Account Security Status</h3>
                   </div>
-                  <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
-                    {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {/* Alert Notification */}
+                    {isRiskTrendingUp() && (
+                      <Badge variant="destructive" className="text-xs animate-pulse">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Alert
+                      </Badge>
+                    )}
+                    <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
+                      {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Health Bar */}
@@ -469,6 +504,27 @@ export function FraudDashboardTab() {
                     <span>{userStats?.total_checks || 0} transactions scanned</span>
                   </div>
                 </div>
+
+                {/* Quick Stats Summary (Last 7 Days) */}
+                {recentLogs.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/50 p-2 rounded-lg">
+                    <Activity className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Last 7 days:</span>
+                    <span className="font-medium">{getWeeklyStats().total} scanned</span>
+                    {getWeeklyStats().blocked > 0 && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="font-medium text-red-600">{getWeeklyStats().blocked} blocked</span>
+                      </>
+                    )}
+                    {getWeeklyStats().highRisk > 0 && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="font-medium text-orange-600">{getWeeklyStats().highRisk} high risk</span>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Status Message */}
                 {(userStats?.total_checks || 0) > 0 && (
