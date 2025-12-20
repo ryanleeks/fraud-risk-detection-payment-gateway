@@ -673,7 +673,7 @@ export function ProfileTab() {
       {/* App Version */}
       <p className="text-center text-xs text-muted-foreground">Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.</p>
       <p className="text-center text-xs text-muted-foreground">For FYP@APU purpose.</p>
-      <p className="text-center text-xs text-muted-foreground">Version Alpha Release [Dev]</p>
+      <p className="text-center text-xs text-muted-foreground">Version </p>
 
       {/* Edit Profile Modal - Name Only */}
       {showEditModal && (
