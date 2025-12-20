@@ -116,10 +116,10 @@ const getUserStats = async (userId) => {
         COUNT(*) as total_checks,
         AVG(risk_score) as avg_risk_score,
         MAX(risk_score) as max_risk_score,
-        SUM(CASE WHEN action_taken = 'BLOCK' THEN 1 ELSE 0 END) as blocked_count,
-        SUM(CASE WHEN action_taken = 'REVIEW' THEN 1 ELSE 0 END) as review_count,
-        SUM(CASE WHEN risk_level = 'CRITICAL' THEN 1 ELSE 0 END) as critical_count,
-        SUM(CASE WHEN risk_level = 'HIGH' THEN 1 ELSE 0 END) as high_count
+        SUM(CASE WHEN UPPER(action_taken) = 'BLOCK' THEN 1 ELSE 0 END) as blocked_count,
+        SUM(CASE WHEN UPPER(action_taken) = 'REVIEW' THEN 1 ELSE 0 END) as review_count,
+        SUM(CASE WHEN UPPER(risk_level) = 'CRITICAL' THEN 1 ELSE 0 END) as critical_count,
+        SUM(CASE WHEN UPPER(risk_level) = 'HIGH' THEN 1 ELSE 0 END) as high_count
       FROM fraud_logs
       WHERE user_id = ?
     `).get(userId);
