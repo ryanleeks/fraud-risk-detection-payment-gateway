@@ -72,13 +72,13 @@ const getUserFraudStats = async (req, res) => {
     res.status(200).json({
       success: true,
       stats: {
-        totalChecks: stats.total_checks || 0,
-        averageRiskScore: stats.avg_risk_score ? parseFloat(stats.avg_risk_score.toFixed(2)) : 0,
-        maxRiskScore: stats.max_risk_score || 0,
-        blockedTransactions: stats.blocked_count || 0,
-        reviewedTransactions: stats.review_count || 0,
-        criticalRiskCount: stats.critical_count || 0,
-        highRiskCount: stats.high_count || 0
+        total_checks: stats.total_checks || 0,
+        avg_risk_score: stats.avg_risk_score ? parseFloat(stats.avg_risk_score.toFixed(2)) : 0,
+        max_risk_score: stats.max_risk_score || 0,
+        blocked_count: stats.blocked_count || 0,
+        review_count: stats.review_count || 0,
+        critical_count: stats.critical_count || 0,
+        high_count: stats.high_count || 0
       }
     });
   } catch (error) {
