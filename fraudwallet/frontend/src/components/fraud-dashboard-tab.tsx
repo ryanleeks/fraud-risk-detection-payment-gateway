@@ -443,6 +443,46 @@ export function FraudDashboardTab() {
         {/* Dashboard Metrics */}
         {activeView === "dashboard" && (
           <>
+            {/* Risk Score Health Bar */}
+            <Card className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`} />
+                    <h3 className="font-semibold">Account Security Status</h3>
+                  </div>
+                  <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
+                    {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
+                  </span>
+                </div>
+
+                {/* Health Bar */}
+                <div className="space-y-2">
+                  <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).color} transition-all duration-500`}
+                      style={{ width: `${getTrustworthinessLevel(userStats?.avg_risk_score || 0).percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Avg Risk Score: {userStats?.avg_risk_score?.toFixed(1) || 0}/100</span>
+                    <span>{userStats?.total_checks || 0} transactions scanned</span>
+                  </div>
+                </div>
+
+                {/* Status Message */}
+                {(userStats?.total_checks || 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {(userStats?.avg_risk_score || 0) < 40
+                      ? "🎉 Excellent! Your account shows low risk activity. Keep up the secure practices!"
+                      : (userStats?.avg_risk_score || 0) < 60
+                      ? "⚠️ Your account has moderate risk. Consider reviewing your transaction patterns."
+                      : "🚨 Your account shows high risk activity. Please contact support if you need assistance."}
+                  </p>
+                )}
+              </div>
+            </Card>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Scanned Total Card */}
               <Card
