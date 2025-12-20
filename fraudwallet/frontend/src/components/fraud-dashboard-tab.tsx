@@ -212,6 +212,32 @@ export function FraudDashboardTab() {
     )
   }
 
+  // Calculate weekly stats from recent logs
+  const getWeeklyStats = () => {
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const weeklyLogs = recentLogs.filter(log => {
+      const logDate = new Date(log.created_at)
+      return logDate >= sevenDaysAgo
+    })
+
+    const blocked = weeklyLogs.filter(log => log.action_taken.toLowerCase() === 'block').length
+    const highRisk = weeklyLogs.filter(log => ['high', 'critical'].includes(log.risk_level.toLowerCase())).length
+    const total = weeklyLogs.length
+
+    return { total, blocked, highRisk }
+  }
+
+  // Check if risk score is trending up (alert condition)
+  const isRiskTrendingUp = () => {
+    const avgScore = userStats?.avg_risk_score || 0
+    const maxScore = userStats?.max_risk_score || 0
+
+    // Alert if average is high or if max score is significantly higher than average
+    return avgScore >= 60 || (maxScore - avgScore) >= 30
+  }
+
   const loadFraudData = async () => {
     setLoading(true)
     try {
@@ -443,6 +469,76 @@ export function FraudDashboardTab() {
         {/* Dashboard Metrics */}
         {activeView === "dashboard" && (
           <>
+            {/* Risk Score Health Bar */}
+            <Card className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Heart className={`h-5 w-5 ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`} />
+                    <h3 className="font-semibold">Account Security Status</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Alert Notification */}
+                    {isRiskTrendingUp() && (
+                      <Badge variant="destructive" className="text-xs animate-pulse">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Alert
+                      </Badge>
+                    )}
+                    <span className={`text-sm font-bold ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).textColor}`}>
+                      {getTrustworthinessLevel(userStats?.avg_risk_score || 0).level}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Health Bar */}
+                <div className="space-y-2">
+                  <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${getTrustworthinessLevel(userStats?.avg_risk_score || 0).color} transition-all duration-500`}
+                      style={{ width: `${getTrustworthinessLevel(userStats?.avg_risk_score || 0).percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Avg Risk Score: {userStats?.avg_risk_score?.toFixed(1) || 0}/100</span>
+                    <span>{userStats?.total_checks || 0} transactions scanned</span>
+                  </div>
+                </div>
+
+                {/* Quick Stats Summary (Last 7 Days) */}
+                {recentLogs.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs bg-muted/50 p-2 rounded-lg">
+                    <Activity className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Last 7 days:</span>
+                    <span className="font-medium">{getWeeklyStats().total} scanned</span>
+                    {getWeeklyStats().blocked > 0 && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="font-medium text-red-600">{getWeeklyStats().blocked} blocked</span>
+                      </>
+                    )}
+                    {getWeeklyStats().highRisk > 0 && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="font-medium text-orange-600">{getWeeklyStats().highRisk} high risk</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Message */}
+                {(userStats?.total_checks || 0) > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {(userStats?.avg_risk_score || 0) < 40
+                      ? "🎉 Excellent! Your account shows low risk activity. Keep up the secure practices!"
+                      : (userStats?.avg_risk_score || 0) < 60
+                      ? "⚠️ Your account has moderate risk. Consider reviewing your transaction patterns."
+                      : "🚨 Your account shows high risk activity. Please contact support if you need assistance."}
+                  </p>
+                )}
+              </div>
+            </Card>
+
             <div className="grid grid-cols-2 gap-4">
               {/* Scanned Total Card */}
               <Card
