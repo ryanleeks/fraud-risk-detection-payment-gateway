@@ -126,6 +126,38 @@ export function PaymentTab() {
       const data = await response.json()
 
       if (data.success) {
+        // Check if transaction was blocked or flagged for review
+        if (data.blocked) {
+          setSendError("")
+          setSendSuccess(false)
+          // Show blocked transaction message with fraud details
+          const fraudInfo = data.fraudDetection
+          const message = `⚠️ Transaction Blocked\n\n` +
+            `Your transaction of RM${amount} to ${recipientData.fullName} has been blocked due to suspicious activity.\n\n` +
+            `Risk Score: ${fraudInfo?.riskScore || 'N/A'}/100 (${fraudInfo?.riskLevel || 'N/A'})\n` +
+            `Reason: ${fraudInfo?.reason || 'Multiple fraud indicators detected'}\n\n` +
+            `Your money (RM${amount}) has been held and will not be credited to the recipient.\n\n` +
+            `You can appeal this decision in the SecureTrack tab. If approved, your money will be returned.`
+
+          alert(message)
+
+          // Refresh to update balance and show held transaction
+          window.location.reload()
+          return { success: true, blocked: true }
+        } else if (data.review) {
+          setSendError("")
+          setSendSuccess(false)
+          // Show review message
+          alert(`⚠️ Transaction Under Review\n\n` +
+            `Your transaction of RM${amount} to ${recipientData.fullName} has been flagged for manual review.\n\n` +
+            `Your money is temporarily held and will be reviewed within 72 hours.\n\n` +
+            `You can check the status in your wallet dashboard.`)
+
+          window.location.reload()
+          return { success: true, review: true }
+        }
+
+        // Normal successful transaction
         setSendSuccess(true)
         setSendError("")
         // Reset form

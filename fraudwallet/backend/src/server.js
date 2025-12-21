@@ -80,6 +80,7 @@ app.post('/api/splitpay/cancel', verifyToken, splitpay.cancelSplitPayment);
 app.get('/api/wallet/balance', verifyToken, wallet.getWalletBalance);
 app.post('/api/wallet/add-funds', verifyToken, wallet.createPaymentIntent);
 app.get('/api/wallet/transactions', verifyToken, wallet.getTransactionHistory);
+app.get('/api/wallet/held-transactions', verifyToken, wallet.getHeldTransactions);
 app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 
 // Fraud Detection routes (protected)

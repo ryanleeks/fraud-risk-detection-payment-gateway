@@ -113,6 +113,7 @@ export function DashboardTab() {
   const [user, setUser] = useState<any>(null)
   const [walletBalance, setWalletBalance] = useState<number>(0)
   const [transactions, setTransactions] = useState<any[]>([])
+  const [heldTransactions, setHeldTransactions] = useState<any[]>([])
   const [showAddFundsModal, setShowAddFundsModal] = useState(false)
   const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
@@ -156,6 +157,17 @@ export function DashboardTab() {
       const transactionsData = await transactionsResponse.json()
       if (transactionsData.success) {
         setTransactions(transactionsData.transactions)
+      }
+
+      // Fetch held transactions
+      const heldResponse = await fetch("http://localhost:8080/api/wallet/held-transactions", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      const heldData = await heldResponse.json()
+      if (heldData.success) {
+        setHeldTransactions(heldData.heldTransactions)
       }
     } catch (err) {
       console.error("Load wallet data error:", err)
@@ -369,6 +381,107 @@ export function DashboardTab() {
         </Card>
       </div>
       */}
+
+      {/* Held Transactions (Money in Escrow) */}
+      {heldTransactions.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <h3 className="font-semibold">Money on Hold</h3>
+              <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full">
+                {heldTransactions.length}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {heldTransactions.map((transaction) => (
+              <Card key={transaction.id} className="p-4 border-amber-500/20 bg-amber-500/5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{transaction.description || "Transfer on hold"}</p>
+                      <TimeDisplay
+                        utcDate={transaction.created_at}
+                        format="full"
+                        showBadge={true}
+                        className="text-xs text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+                  <p className="font-semibold text-amber-600">
+                    RM {transaction.amount.toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Fraud Details */}
+                {transaction.risk_score && (
+                  <div className="mb-3 p-3 bg-background/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium">Risk Score</span>
+                      <span className={`text-xs font-semibold ${
+                        transaction.risk_level === 'CRITICAL' ? 'text-red-600' :
+                        transaction.risk_level === 'HIGH' ? 'text-orange-600' :
+                        'text-yellow-600'
+                      }`}>
+                        {transaction.risk_score}/100 - {transaction.risk_level}
+                      </span>
+                    </div>
+                    {transaction.ai_reasoning && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {transaction.ai_reasoning}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Expiration Info */}
+                {transaction.held_until && (
+                  <div className="mb-3 text-xs text-muted-foreground">
+                    <strong>Held until:</strong>{" "}
+                    <TimeDisplay
+                      utcDate={transaction.held_until}
+                      format="full"
+                      showBadge={false}
+                      className="inline"
+                    />
+                  </div>
+                )}
+
+                {/* Appeal Status / Action */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  {transaction.appeal_id ? (
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        transaction.appeal_status === 'pending' ? 'bg-blue-500/10 text-blue-600' :
+                        transaction.appeal_status === 'approved' ? 'bg-green-500/10 text-green-600' :
+                        'bg-red-500/10 text-red-600'
+                      }`}>
+                        Appeal: {transaction.appeal_status}
+                      </span>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => router.push('/?tab=securetrack')}
+                    >
+                      Appeal This Transaction
+                    </Button>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    Transaction #{transaction.id}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent Transactions */}
       <div>
