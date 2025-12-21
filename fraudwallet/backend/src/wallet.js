@@ -479,17 +479,120 @@ const sendMoney = async (req, res) => {
     // Log fraud check result
     console.log(`🔍 Fraud Check - User ${senderId}: Score ${fraudCheck.riskScore}/100 (${fraudCheck.riskLevel}) - Action: ${fraudCheck.action}`);
 
-    // Handle fraud detection result
-    if (fraudCheck.action === 'BLOCK') {
-      return res.status(403).json({
-        success: false,
-        message: 'Transaction blocked due to fraud risk',
+    // Determine transaction status based on fraud detection
+    const isBlocked = fraudCheck.action === 'BLOCK';
+    const isReview = fraudCheck.action === 'REVIEW';
+
+    // For blocked/high-risk transactions, we'll hold the money
+    const shouldHoldMoney = isBlocked || isReview;
+    const moneyStatus = shouldHoldMoney ? 'held' : 'completed';
+
+    // Calculate hold duration (72 hours for review, 168 hours/7 days for blocked)
+    let heldUntil = null;
+    if (shouldHoldMoney) {
+      heldUntil = new Date();
+      heldUntil.setHours(heldUntil.getHours() + (isBlocked ? 168 : 72));
+    }
+
+    if (fraudCheck.action === 'REVIEW') {
+      console.log(`⚠️  HIGH RISK TRANSACTION - Flagged for review: User ${senderId}, Amount: RM${validatedAmount.toFixed(2)}`);
+    }
+
+    if (isBlocked) {
+      console.log(`🔒 BLOCKED TRANSACTION - Money will be held: User ${senderId}, Amount: RM${validatedAmount.toFixed(2)}`);
+    }
+
+    // Perform transfer in a transaction for atomicity
+    let senderTransactionId;
+    const transfer = db.transaction(() => {
+      // Deduct from sender (always happens)
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance - ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(validatedAmount, senderId);
+
+      // Only add to recipient if NOT holding money
+      if (!shouldHoldMoney) {
+        db.prepare(`
+          UPDATE users
+          SET wallet_balance = wallet_balance + ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(validatedAmount, recipientId);
+      }
+
+      // Create transaction record for sender
+      const description = note || `Transfer to ${recipient.full_name}`;
+      const result = db.prepare(`
+        INSERT INTO transactions (
+          user_id, type, amount, status, description, recipient_id,
+          money_status, held_until, fraud_log_id
+        )
+        VALUES (?, 'transfer_sent', ?, 'completed', ?, ?, ?, ?, ?)
+      `).run(
+        senderId,
+        validatedAmount,
+        description,
+        recipientId,
+        moneyStatus,
+        heldUntil ? heldUntil.toISOString() : null,
+        fraudCheck.logId || null
+      );
+
+      senderTransactionId = result.lastInsertRowid;
+
+      // Create transaction record for recipient
+      const recipientDescription = note || `Transfer from ${sender.full_name}`;
+      const recipientStatus = shouldHoldMoney ? 'pending' : 'completed';
+      db.prepare(`
+        INSERT INTO transactions (
+          user_id, type, amount, status, description, recipient_id,
+          money_status, held_until, fraud_log_id
+        )
+        VALUES (?, 'transfer_received', ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        recipientId,
+        validatedAmount,
+        recipientStatus,
+        recipientDescription,
+        senderId,
+        moneyStatus,
+        heldUntil ? heldUntil.toISOString() : null,
+        fraudCheck.logId || null
+      );
+    });
+
+    // Execute the transaction
+    transfer();
+
+    console.log(`✅ Transfer processed: User ${senderId} sent RM${validatedAmount.toFixed(2)} to User ${recipientId} (Status: ${moneyStatus})`);
+
+    // Return appropriate response based on status
+    if (isBlocked) {
+      return res.status(200).json({
+        success: true,
+        blocked: true,
+        message: 'Transaction has been blocked and is under review. You can appeal this decision.',
+        transfer: {
+          transactionId: senderTransactionId,
+          amount: validatedAmount,
+          status: 'blocked',
+          moneyStatus: 'held',
+          heldUntil: heldUntil.toISOString(),
+          recipient: {
+            name: recipient.full_name,
+            accountId: recipient.account_id
+          },
+          canAppeal: true
+        },
         fraudDetection: {
           riskScore: fraudCheck.riskScore,
           riskLevel: fraudCheck.riskLevel,
           reason: fraudCheck.aiAnalysis?.reasoning || 'Multiple fraud indicators detected',
           detectionMethod: fraudCheck.detectionMethod,
-          triggeredRules: fraudCheck.triggeredRules.map(r => ({
+          triggeredRules: fraudCheck.triggeredRules?.map(r => ({
             name: r.ruleName,
             description: r.description
           })),
@@ -502,54 +605,32 @@ const sendMoney = async (req, res) => {
       });
     }
 
-    if (fraudCheck.action === 'REVIEW') {
-      // Flag for manual review but allow transaction
-      console.log(`⚠️  HIGH RISK TRANSACTION - Flagged for review: User ${senderId}, Amount: RM${validatedAmount.toFixed(2)}`);
+    if (isReview) {
+      return res.status(200).json({
+        success: true,
+        review: true,
+        message: 'Transaction flagged for review. Money is temporarily held pending verification.',
+        transfer: {
+          transactionId: senderTransactionId,
+          amount: validatedAmount,
+          status: 'review',
+          moneyStatus: 'held',
+          heldUntil: heldUntil.toISOString(),
+          recipient: {
+            name: recipient.full_name,
+            accountId: recipient.account_id
+          }
+        }
+      });
     }
-
-    // Perform transfer in a transaction for atomicity
-    const transfer = db.transaction(() => {
-      // Deduct from sender
-      db.prepare(`
-        UPDATE users
-        SET wallet_balance = wallet_balance - ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(validatedAmount, senderId);
-
-      // Add to recipient
-      db.prepare(`
-        UPDATE users
-        SET wallet_balance = wallet_balance + ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(validatedAmount, recipientId);
-
-      // Create transaction record for sender
-      const description = note || `Transfer to ${recipient.full_name}`;
-      db.prepare(`
-        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
-        VALUES (?, 'transfer_sent', ?, 'completed', ?, ?)
-      `).run(senderId, validatedAmount, description, recipientId);
-
-      // Create transaction record for recipient
-      const recipientDescription = note || `Transfer from ${sender.full_name}`;
-      db.prepare(`
-        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
-        VALUES (?, 'transfer_received', ?, 'completed', ?, ?)
-      `).run(recipientId, validatedAmount, recipientDescription, senderId);
-    });
-
-    // Execute the transaction
-    transfer();
-
-    console.log(`✅ Transfer successful: User ${senderId} sent RM${validatedAmount.toFixed(2)} to User ${recipientId}`);
 
     res.status(200).json({
       success: true,
       message: 'Transfer successful',
       transfer: {
+        transactionId: senderTransactionId,
         amount: validatedAmount,
+        status: 'completed',
         recipient: {
           name: recipient.full_name,
           accountId: recipient.account_id
@@ -566,10 +647,272 @@ const sendMoney = async (req, res) => {
   }
 };
 
+/**
+ * HOLD MONEY
+ * Hold transaction funds when blocked or under review
+ * Money is deducted from sender but not yet credited to recipient
+ */
+const holdMoney = async (transactionId, fraudLogId, holdDuration = 72) => {
+  try {
+    const transaction = db.prepare(`
+      SELECT t.*, u.wallet_balance
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      WHERE t.id = ?
+    `).get(transactionId);
+
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    if (transaction.money_status !== 'completed') {
+      throw new Error('Transaction cannot be held in current state');
+    }
+
+    // Calculate hold expiration (default 72 hours for review)
+    const heldUntil = new Date();
+    heldUntil.setHours(heldUntil.getHours() + holdDuration);
+
+    // Update transaction to held status
+    db.prepare(`
+      UPDATE transactions
+      SET money_status = 'held',
+          held_until = ?,
+          fraud_log_id = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(heldUntil.toISOString(), fraudLogId, transactionId);
+
+    console.log(`🔒 Money held: Transaction ${transactionId} - RM${transaction.amount} held until ${heldUntil.toISOString()}`);
+
+    return {
+      success: true,
+      transactionId,
+      amount: transaction.amount,
+      heldUntil: heldUntil.toISOString()
+    };
+
+  } catch (error) {
+    console.error('❌ Hold money error:', error);
+    throw error;
+  }
+};
+
+/**
+ * RELEASE MONEY
+ * Complete the transaction by releasing held funds to recipient
+ * Used when appeal is approved or transaction is cleared
+ */
+const releaseMoney = async (transactionId, resolvedBy, reason = 'Appeal approved') => {
+  try {
+    const transaction = db.prepare(`
+      SELECT * FROM transactions WHERE id = ?
+    `).get(transactionId);
+
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    if (transaction.money_status !== 'held') {
+      throw new Error('Transaction is not in held status');
+    }
+
+    // Perform release in a transaction for atomicity
+    const release = db.transaction(() => {
+      // Credit recipient's wallet
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(transaction.amount, transaction.recipient_id);
+
+      // Update transaction status
+      db.prepare(`
+        UPDATE transactions
+        SET money_status = 'completed',
+            resolution_action = 'approve',
+            resolved_at = CURRENT_TIMESTAMP,
+            resolved_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(resolvedBy, transactionId);
+
+      // Also update the recipient's transaction record
+      db.prepare(`
+        UPDATE transactions
+        SET status = 'completed',
+            money_status = 'completed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).run(transaction.recipient_id, transaction.user_id, transaction.amount);
+    });
+
+    release();
+
+    console.log(`✅ Money released: Transaction ${transactionId} - RM${transaction.amount} credited to user ${transaction.recipient_id}`);
+
+    return {
+      success: true,
+      transactionId,
+      amount: transaction.amount,
+      recipientId: transaction.recipient_id,
+      reason
+    };
+
+  } catch (error) {
+    console.error('❌ Release money error:', error);
+    throw error;
+  }
+};
+
+/**
+ * RETURN MONEY
+ * Return held funds to the original sender
+ * Used when appeal is rejected or fraud is confirmed
+ */
+const returnMoney = async (transactionId, resolvedBy, reason = 'Appeal rejected') => {
+  try {
+    const transaction = db.prepare(`
+      SELECT * FROM transactions WHERE id = ?
+    `).get(transactionId);
+
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    if (transaction.money_status !== 'held') {
+      throw new Error('Transaction is not in held status');
+    }
+
+    // Perform return in a transaction for atomicity
+    const returnMoney = db.transaction(() => {
+      // Return funds to sender's wallet
+      db.prepare(`
+        UPDATE users
+        SET wallet_balance = wallet_balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(transaction.amount, transaction.user_id);
+
+      // Update transaction status
+      db.prepare(`
+        UPDATE transactions
+        SET money_status = 'returned',
+            resolution_action = 'reject',
+            resolved_at = CURRENT_TIMESTAMP,
+            resolved_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(resolvedBy, transactionId);
+
+      // Mark recipient's transaction as cancelled
+      db.prepare(`
+        UPDATE transactions
+        SET status = 'cancelled',
+            money_status = 'returned',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).run(transaction.recipient_id, transaction.user_id, transaction.amount);
+    });
+
+    returnMoney();
+
+    console.log(`↩️  Money returned: Transaction ${transactionId} - RM${transaction.amount} returned to user ${transaction.user_id}`);
+
+    return {
+      success: true,
+      transactionId,
+      amount: transaction.amount,
+      senderId: transaction.user_id,
+      reason
+    };
+
+  } catch (error) {
+    console.error('❌ Return money error:', error);
+    throw error;
+  }
+};
+
+/**
+ * CONFISCATE MONEY
+ * Confiscate held funds for confirmed fraud
+ * Funds are moved to a system account (user_id = 1 or designated admin)
+ */
+const confiscateMoney = async (transactionId, resolvedBy, reason = 'Confirmed fraud') => {
+  try {
+    const transaction = db.prepare(`
+      SELECT * FROM transactions WHERE id = ?
+    `).get(transactionId);
+
+    if (!transaction) {
+      throw new Error('Transaction not found');
+    }
+
+    if (transaction.money_status !== 'held') {
+      throw new Error('Transaction is not in held status');
+    }
+
+    // Perform confiscation in a transaction for atomicity
+    const confiscate = db.transaction(() => {
+      // Update transaction status (money stays removed from sender, not credited anywhere)
+      db.prepare(`
+        UPDATE transactions
+        SET money_status = 'confiscated',
+            resolution_action = 'confiscate',
+            resolved_at = CURRENT_TIMESTAMP,
+            resolved_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(resolvedBy, transactionId);
+
+      // Mark recipient's transaction as confiscated
+      db.prepare(`
+        UPDATE transactions
+        SET status = 'cancelled',
+            money_status = 'confiscated',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).run(transaction.recipient_id, transaction.user_id, transaction.amount);
+
+      // Create system record of confiscated funds
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, money_status)
+        VALUES (?, 'system_confiscation', ?, 'completed', ?, 'completed')
+      `).run(resolvedBy, transaction.amount, `Confiscated from transaction #${transactionId}: ${reason}`, 'completed');
+    });
+
+    confiscate();
+
+    console.log(`⚠️  Money confiscated: Transaction ${transactionId} - RM${transaction.amount} confiscated for: ${reason}`);
+
+    return {
+      success: true,
+      transactionId,
+      amount: transaction.amount,
+      reason
+    };
+
+  } catch (error) {
+    console.error('❌ Confiscate money error:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getWalletBalance,
   createPaymentIntent,
   handleStripeWebhook,
   getTransactionHistory,
-  sendMoney
+  sendMoney,
+  holdMoney,
+  releaseMoney,
+  returnMoney,
+  confiscateMoney
 };
