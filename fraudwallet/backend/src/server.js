@@ -120,6 +120,12 @@ app.get('/api/fraud/appeals/my-appeals', verifyToken, fraudAPI.getUserAppeals);
 app.post('/api/fraud/appeals/:appealId/resolve', verifyAdminToken, fraudAPI.resolveAppeal);
 app.get('/api/fraud/my-flags', verifyToken, fraudAPI.getUserFraudFlags);
 
+// Money management routes (Admin only)
+app.get('/api/fraud/held-transactions', verifyAdminToken, fraudAPI.getHeldTransactions);
+app.post('/api/fraud/money/:transactionId/release', verifyAdminToken, fraudAPI.adminReleaseMoney);
+app.post('/api/fraud/money/:transactionId/return', verifyAdminToken, fraudAPI.adminReturnMoney);
+app.post('/api/fraud/money/:transactionId/confiscate', verifyAdminToken, fraudAPI.adminConfiscateMoney);
+
 // Admin routes (Admin only)
 const adminAPI = require('./adminAPI');
 app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);

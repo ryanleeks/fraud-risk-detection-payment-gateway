@@ -5,6 +5,7 @@ const fraudDetection = require('./fraud-detection');
 const fraudLogger = require('./fraud-detection/monitoring/fraudLogger');
 const academicMetrics = require('./fraud-detection/monitoring/academicMetrics');
 const db = require('./database');
+const wallet = require('./wallet');
 
 /**
  * Get dashboard metrics for current user
@@ -991,6 +992,16 @@ const resolveAppeal = async (req, res) => {
 
     const adminId = req.user.userId;
 
+    // Get the appeal before resolving to find associated transaction
+    const appeal = db.prepare('SELECT * FROM fraud_appeals WHERE id = ?').get(parseInt(appealId));
+    if (!appeal) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appeal not found'
+      });
+    }
+
+    // Resolve the appeal
     const updatedAppeal = fraudLogger.resolveAppeal(
       parseInt(appealId),
       adminId,
@@ -998,10 +1009,64 @@ const resolveAppeal = async (req, res) => {
       adminNotes || ''
     );
 
+    // Find the held transaction associated with this fraud log
+    const heldTransaction = db.prepare(`
+      SELECT * FROM transactions
+      WHERE fraud_log_id = ? AND money_status = 'held' AND type = 'transfer_sent'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(appeal.fraud_log_id);
+
+    let moneyAction = null;
+
+    // Handle money management based on appeal resolution
+    if (heldTransaction) {
+      try {
+        if (status === 'approved') {
+          // Release money to recipient
+          const result = await wallet.releaseMoney(
+            heldTransaction.id,
+            adminId,
+            `Appeal #${appealId} approved: ${adminNotes || 'Transaction cleared'}`
+          );
+          moneyAction = {
+            action: 'released',
+            amount: result.amount,
+            recipientId: result.recipientId
+          };
+          console.log(`💰 Money released for appeal #${appealId}: RM${result.amount} to user ${result.recipientId}`);
+        } else if (status === 'rejected') {
+          // Return money to sender
+          const result = await wallet.returnMoney(
+            heldTransaction.id,
+            adminId,
+            `Appeal #${appealId} rejected: ${adminNotes || 'Fraudulent transaction confirmed'}`
+          );
+          moneyAction = {
+            action: 'returned',
+            amount: result.amount,
+            senderId: result.senderId
+          };
+          console.log(`💰 Money returned for appeal #${appealId}: RM${result.amount} to user ${result.senderId}`);
+        }
+      } catch (moneyError) {
+        console.error('Money management error during appeal resolution:', moneyError);
+        // Continue with appeal resolution even if money action fails
+        // This prevents partial state issues
+        moneyAction = {
+          action: 'error',
+          error: moneyError.message
+        };
+      }
+    } else {
+      console.log(`ℹ️  No held transaction found for fraud_log_id ${appeal.fraud_log_id}`);
+    }
+
     res.status(200).json({
       success: true,
       message: `Appeal ${status} successfully`,
-      appeal: updatedAppeal
+      appeal: updatedAppeal,
+      moneyAction: moneyAction
     });
   } catch (error) {
     console.error('Resolve appeal error:', error);
@@ -1057,6 +1122,141 @@ const triggerAutoApproval = async (req, res) => {
   }
 };
 
+/**
+ * Get all held transactions (admin only)
+ * Returns transactions with money_status = 'held'
+ */
+const getHeldTransactions = async (req, res) => {
+  try {
+    const heldTransactions = db.prepare(`
+      SELECT
+        t.*,
+        sender.full_name as sender_name,
+        sender.account_id as sender_account_id,
+        recipient.full_name as recipient_name,
+        recipient.account_id as recipient_account_id,
+        fl.risk_score,
+        fl.risk_level,
+        fl.action_taken,
+        fa.id as appeal_id,
+        fa.status as appeal_status
+      FROM transactions t
+      JOIN users sender ON t.user_id = sender.id
+      LEFT JOIN users recipient ON t.recipient_id = recipient.id
+      LEFT JOIN fraud_logs fl ON t.fraud_log_id = fl.id
+      LEFT JOIN fraud_appeals fa ON fl.id = fa.fraud_log_id
+      WHERE t.money_status = 'held'
+      ORDER BY t.created_at DESC
+    `).all();
+
+    res.status(200).json({
+      success: true,
+      count: heldTransactions.length,
+      transactions: heldTransactions
+    });
+  } catch (error) {
+    console.error('Get held transactions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching held transactions'
+    });
+  }
+};
+
+/**
+ * Manually release held money (admin only)
+ */
+const adminReleaseMoney = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.userId;
+
+    const result = await wallet.releaseMoney(
+      parseInt(transactionId),
+      adminId,
+      reason || 'Admin manual release'
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Money released successfully',
+      result
+    });
+  } catch (error) {
+    console.error('Admin release money error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error releasing money'
+    });
+  }
+};
+
+/**
+ * Manually return held money (admin only)
+ */
+const adminReturnMoney = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.userId;
+
+    const result = await wallet.returnMoney(
+      parseInt(transactionId),
+      adminId,
+      reason || 'Admin manual return'
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Money returned successfully',
+      result
+    });
+  } catch (error) {
+    console.error('Admin return money error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error returning money'
+    });
+  }
+};
+
+/**
+ * Confiscate held money (admin only)
+ */
+const adminConfiscateMoney = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.userId;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required for confiscation'
+      });
+    }
+
+    const result = await wallet.confiscateMoney(
+      parseInt(transactionId),
+      adminId,
+      reason
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Money confiscated successfully',
+      result
+    });
+  } catch (error) {
+    console.error('Admin confiscate money error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error confiscating money'
+    });
+  }
+};
+
 module.exports = {
   getUserDashboardMetrics,
   getUserFraudStats,
@@ -1089,5 +1289,10 @@ module.exports = {
   getPendingAppeals,
   getUserAppeals,
   resolveAppeal,
-  getUserFraudFlags
+  getUserFraudFlags,
+  // Money management endpoints (admin)
+  getHeldTransactions,
+  adminReleaseMoney,
+  adminReturnMoney,
+  adminConfiscateMoney
 };
