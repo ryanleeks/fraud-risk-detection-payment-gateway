@@ -359,6 +359,55 @@ const getTransactionHistory = (req, res) => {
 };
 
 /**
+ * GET HELD TRANSACTIONS
+ * Get user's held transactions (money in escrow)
+ */
+const getHeldTransactions = (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const heldTransactions = db.prepare(`
+      SELECT
+        t.id,
+        t.type,
+        t.amount,
+        t.status,
+        t.money_status,
+        t.description,
+        t.held_until,
+        t.created_at,
+        u.full_name as recipient_name,
+        u.account_id as recipient_account_id,
+        fl.risk_score,
+        fl.risk_level,
+        fl.action_taken,
+        fl.ai_reasoning,
+        fa.id as appeal_id,
+        fa.status as appeal_status
+      FROM transactions t
+      LEFT JOIN users u ON t.recipient_id = u.id
+      LEFT JOIN fraud_logs fl ON t.fraud_log_id = fl.id
+      LEFT JOIN fraud_appeals fa ON fl.id = fa.fraud_log_id
+      WHERE t.user_id = ? AND t.money_status = 'held'
+      ORDER BY t.created_at DESC
+    `).all(userId);
+
+    res.status(200).json({
+      success: true,
+      count: heldTransactions.length,
+      heldTransactions
+    });
+
+  } catch (error) {
+    console.error('❌ Get held transactions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching held transactions'
+    });
+  }
+};
+
+/**
  * Extract IP address from request
  */
 const getClientIP = (req) => {
@@ -910,6 +959,7 @@ module.exports = {
   createPaymentIntent,
   handleStripeWebhook,
   getTransactionHistory,
+  getHeldTransactions,
   sendMoney,
   holdMoney,
   releaseMoney,
