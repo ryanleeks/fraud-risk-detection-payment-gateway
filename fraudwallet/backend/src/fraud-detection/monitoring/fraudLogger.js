@@ -7,6 +7,7 @@ const db = require('../../database');
  * Log a fraud check result
  * @param {Object} transaction - Transaction details
  * @param {Object} fraudResult - Fraud detection result
+ * @returns {number|null} The fraud log ID, or null if logging failed
  */
 const logFraudCheck = async (transaction, fraudResult) => {
   try {
@@ -24,7 +25,7 @@ const logFraudCheck = async (transaction, fraudResult) => {
     const recipientData = transaction.recipientData || {};
 
     // Insert fraud check log with AI, location, and recipient data
-    db.prepare(`
+    const result = db.prepare(`
       INSERT INTO fraud_logs (
         user_id,
         transaction_type,
@@ -79,6 +80,8 @@ const logFraudCheck = async (transaction, fraudResult) => {
       recipientData.accountId || null
     );
 
+    const logId = result.lastInsertRowid;
+
     // Log to console for real-time monitoring
     if (fraudResult.riskScore >= 60) {
       console.log(`🚨 HIGH RISK TRANSACTION DETECTED`);
@@ -99,8 +102,11 @@ const logFraudCheck = async (transaction, fraudResult) => {
       console.log(`⚠️  MEDIUM RISK: User ${transaction.userId}, Score: ${fraudResult.riskScore}/100 (${fraudResult.detectionMethod || 'rules'})`);
     }
 
+    return logId;
+
   } catch (error) {
     console.error('Fraud logging error:', error);
+    return null;
   }
 };
 
