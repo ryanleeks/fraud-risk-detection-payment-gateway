@@ -382,6 +382,8 @@ const getHeldTransactions = (req, res) => {
         fl.risk_level,
         fl.action_taken,
         fl.ai_reasoning,
+        fl.admin_review_status,
+        fl.admin_reviewed_at,
         fa.id as appeal_id,
         fa.status as appeal_status
       FROM transactions t
