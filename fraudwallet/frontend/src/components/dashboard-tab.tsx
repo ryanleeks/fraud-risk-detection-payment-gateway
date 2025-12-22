@@ -454,6 +454,7 @@ export function DashboardTab() {
                 {/* Appeal Status / Action */}
                 <div className="flex items-center justify-between pt-2 border-t">
                   {transaction.appeal_id ? (
+                    // Already appealed - show appeal status
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         transaction.appeal_status === 'pending' ? 'bg-blue-500/10 text-blue-600' :
@@ -463,7 +464,15 @@ export function DashboardTab() {
                         Appeal: {transaction.appeal_status}
                       </span>
                     </div>
-                  ) : (
+                  ) : transaction.admin_review_status === 'pending' || !transaction.admin_review_status ? (
+                    // Waiting for admin review - can't appeal yet
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600">
+                        ⏳ Waiting for Admin Review
+                      </span>
+                    </div>
+                  ) : transaction.admin_review_status === 'fraud' ? (
+                    // Admin confirmed fraud - can appeal now
                     <Button
                       size="sm"
                       variant="outline"
@@ -472,6 +481,11 @@ export function DashboardTab() {
                     >
                       Appeal This Transaction
                     </Button>
+                  ) : (
+                    // Admin marked as legitimate - should have been auto-released
+                    <span className="text-xs text-green-600">
+                      ✓ Cleared by Admin
+                    </span>
                   )}
                   <span className="text-xs text-muted-foreground">
                     Transaction #{transaction.id}

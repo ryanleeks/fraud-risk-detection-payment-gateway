@@ -689,6 +689,22 @@ const submitAppeal = (fraudLogId, userId, reason) => {
       throw new Error('You can only appeal your own fraud detections');
     }
 
+    // NEW: Check if admin has reviewed first
+    if (!log.admin_review_status || log.admin_review_status === 'pending') {
+      throw new Error('You cannot appeal until an admin reviews this transaction. Please wait for admin review.');
+    }
+
+    // Only allow appeals if admin marked as fraud
+    if (log.admin_review_status !== 'fraud') {
+      throw new Error('This transaction was already cleared by admin and cannot be appealed.');
+    }
+
+    // Check if already appealed
+    const existingAppeal = db.prepare('SELECT * FROM fraud_appeals WHERE fraud_log_id = ?').get(fraudLogId);
+    if (existingAppeal) {
+      throw new Error('You have already submitted an appeal for this transaction');
+    }
+
     // Create appeal
     const result = db.prepare(`
       INSERT INTO fraud_appeals (fraud_log_id, user_id, reason, status)
