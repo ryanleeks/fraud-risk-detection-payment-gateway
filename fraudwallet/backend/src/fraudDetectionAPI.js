@@ -559,16 +559,70 @@ const verifyGroundTruth = async (req, res) => {
     // Verify as admin (user ID from auth)
     const verifiedBy = req.user.userId;
 
+    // Verify the ground truth (updates academic metrics)
     const updatedLog = await fraudLogger.verifyGroundTruth(
       parseInt(logId),
       groundTruth,
       verifiedBy
     );
 
+    // Update admin review status
+    db.prepare(`
+      UPDATE fraud_logs
+      SET admin_review_status = ?,
+          admin_reviewed_at = CURRENT_TIMESTAMP,
+          admin_reviewed_by = ?
+      WHERE id = ?
+    `).run(groundTruth, verifiedBy, parseInt(logId));
+
+    let moneyAction = null;
+
+    // Find held transaction associated with this fraud log
+    const heldTransaction = db.prepare(`
+      SELECT * FROM transactions
+      WHERE fraud_log_id = ? AND money_status = 'held' AND type = 'transfer_sent'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(parseInt(logId));
+
+    // Handle money based on admin decision
+    if (heldTransaction) {
+      try {
+        if (groundTruth === 'legitimate') {
+          // False Positive - Release money immediately
+          const result = await wallet.releaseMoney(
+            heldTransaction.id,
+            verifiedBy,
+            `Admin marked as legitimate (False Positive)`
+          );
+          moneyAction = {
+            action: 'released',
+            amount: result.amount,
+            recipientId: result.recipientId
+          };
+          console.log(`💰 Money auto-released for fraud_log #${logId}: RM${result.amount} (False Positive)`);
+        } else if (groundTruth === 'fraud') {
+          // Confirmed fraud - Keep held, user can now appeal
+          console.log(`🚫 Admin confirmed fraud for fraud_log #${logId}. User can now appeal.`);
+          moneyAction = {
+            action: 'held',
+            message: 'Money remains held. User can appeal this decision.'
+          };
+        }
+      } catch (moneyError) {
+        console.error('Money management error during ground truth verification:', moneyError);
+        moneyAction = {
+          action: 'error',
+          error: moneyError.message
+        };
+      }
+    }
+
     res.status(200).json({
       success: true,
-      message: 'Ground truth verified successfully',
-      log: updatedLog
+      message: `Ground truth verified successfully as ${groundTruth}`,
+      log: updatedLog,
+      moneyAction: moneyAction
     });
   } catch (error) {
     console.error('Verify ground truth error:', error);

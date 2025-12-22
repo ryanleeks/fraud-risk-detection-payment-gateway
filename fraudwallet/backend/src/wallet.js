@@ -763,18 +763,38 @@ const releaseMoney = async (transactionId, resolvedBy, reason = 'Appeal approved
     }
 
     if (transaction.money_status !== 'held') {
-      throw new Error('Transaction is not in held status');
+      throw new Error(`Transaction is not in held status. Current status: ${transaction.money_status}`);
+    }
+
+    // SAFETY CHECK: Verify this is a sender transaction
+    if (transaction.type !== 'transfer_sent') {
+      throw new Error('Can only release money from sender transactions');
+    }
+
+    // SAFETY CHECK: Check if already resolved
+    if (transaction.resolution_action) {
+      throw new Error(`Transaction already resolved with action: ${transaction.resolution_action}`);
+    }
+
+    // Get recipient to verify balance won't go negative
+    const recipient = db.prepare('SELECT id, wallet_balance FROM users WHERE id = ?').get(transaction.recipient_id);
+    if (!recipient) {
+      throw new Error('Recipient not found');
     }
 
     // Perform release in a transaction for atomicity
     const release = db.transaction(() => {
       // Credit recipient's wallet
-      db.prepare(`
+      const recipientUpdate = db.prepare(`
         UPDATE users
         SET wallet_balance = wallet_balance + ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(transaction.amount, transaction.recipient_id);
+
+      if (recipientUpdate.changes === 0) {
+        throw new Error('Failed to credit recipient - user not found');
+      }
 
       // Update transaction status
       db.prepare(`
@@ -793,10 +813,16 @@ const releaseMoney = async (transactionId, resolvedBy, reason = 'Appeal approved
         SET status = 'completed',
             money_status = 'completed',
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ?
+        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ? AND money_status = 'held'
         ORDER BY created_at DESC
         LIMIT 1
       `).run(transaction.recipient_id, transaction.user_id, transaction.amount);
+
+      // Create audit log
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, money_status)
+        VALUES (?, 'system_audit', ?, 'completed', ?, 'completed')
+      `).run(resolvedBy, 0, `Released RM${transaction.amount} from transaction #${transactionId}: ${reason}`);
     });
 
     release();
@@ -833,18 +859,38 @@ const returnMoney = async (transactionId, resolvedBy, reason = 'Appeal rejected'
     }
 
     if (transaction.money_status !== 'held') {
-      throw new Error('Transaction is not in held status');
+      throw new Error(`Transaction is not in held status. Current status: ${transaction.money_status}`);
+    }
+
+    // SAFETY CHECK: Verify this is a sender transaction
+    if (transaction.type !== 'transfer_sent') {
+      throw new Error('Can only return money from sender transactions');
+    }
+
+    // SAFETY CHECK: Check if already resolved
+    if (transaction.resolution_action) {
+      throw new Error(`Transaction already resolved with action: ${transaction.resolution_action}`);
+    }
+
+    // Get sender to verify balance won't go negative
+    const sender = db.prepare('SELECT id, wallet_balance FROM users WHERE id = ?').get(transaction.user_id);
+    if (!sender) {
+      throw new Error('Sender not found');
     }
 
     // Perform return in a transaction for atomicity
-    const returnMoney = db.transaction(() => {
+    const returnMoneyTx = db.transaction(() => {
       // Return funds to sender's wallet
-      db.prepare(`
+      const senderUpdate = db.prepare(`
         UPDATE users
         SET wallet_balance = wallet_balance + ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(transaction.amount, transaction.user_id);
+
+      if (senderUpdate.changes === 0) {
+        throw new Error('Failed to refund sender - user not found');
+      }
 
       // Update transaction status
       db.prepare(`
@@ -863,13 +909,19 @@ const returnMoney = async (transactionId, resolvedBy, reason = 'Appeal rejected'
         SET status = 'cancelled',
             money_status = 'returned',
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ?
+        WHERE user_id = ? AND recipient_id = ? AND type = 'transfer_received' AND amount = ? AND money_status = 'held'
         ORDER BY created_at DESC
         LIMIT 1
       `).run(transaction.recipient_id, transaction.user_id, transaction.amount);
+
+      // Create audit log
+      db.prepare(`
+        INSERT INTO transactions (user_id, type, amount, status, description, money_status)
+        VALUES (?, 'system_audit', ?, 'completed', ?, 'completed')
+      `).run(resolvedBy, 0, `Returned RM${transaction.amount} from transaction #${transactionId}: ${reason}`);
     });
 
-    returnMoney();
+    returnMoneyTx();
 
     console.log(`↩️  Money returned: Transaction ${transactionId} - RM${transaction.amount} returned to user ${transaction.user_id}`);
 

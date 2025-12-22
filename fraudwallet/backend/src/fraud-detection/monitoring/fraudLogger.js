@@ -385,6 +385,22 @@ const createFraudLogsTable = () => {
         console.log('✅ Added revoked_reason column to fraud_logs');
       }
 
+      // Admin review status for the new workflow
+      if (!columnNames.includes('admin_review_status')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN admin_review_status TEXT DEFAULT 'pending'");
+        console.log('✅ Added admin_review_status column to fraud_logs');
+      }
+
+      if (!columnNames.includes('admin_reviewed_at')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN admin_reviewed_at DATETIME");
+        console.log('✅ Added admin_reviewed_at column to fraud_logs');
+      }
+
+      if (!columnNames.includes('admin_reviewed_by')) {
+        db.exec("ALTER TABLE fraud_logs ADD COLUMN admin_reviewed_by INTEGER");
+        console.log('✅ Added admin_reviewed_by column to fraud_logs');
+      }
+
       if (!columnNames.includes('appeal_status')) {
         db.exec("ALTER TABLE fraud_logs ADD COLUMN appeal_status TEXT DEFAULT 'none'");
         console.log('✅ Added appeal_status column to fraud_logs');
