@@ -156,7 +156,10 @@ const analyzeFraudRisk = async (transaction, userContext = {}) => {
     };
 
     // Log for monitoring and academic metrics tracking
-    await fraudLogger.logFraudCheck(transaction, result);
+    const logId = await fraudLogger.logFraudCheck(transaction, result);
+
+    // Add logId to result so it can be saved with the transaction
+    result.logId = logId;
 
     console.log(`   ✅ AI Detection complete (${result.executionTime}ms)\n`);
 
