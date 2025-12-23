@@ -85,12 +85,12 @@ const calculateDecayWeight = (ageInDays) => {
 const calculateTimeWeightedHealthScore = (userId) => {
   try {
     // Build query with optional filters
-    let whereClause = 'WHERE user_id = ? AND created_at >= datetime("now", ?)';
+    let whereClause = 'WHERE user_id = ? AND created_at >= datetime(\'now\', ?)';
     const params = [userId, `-${LOOKBACK_PERIOD_DAYS} days`];
 
     // Exclude transactions marked as legitimate (successful appeals)
     if (EXCLUDE_LEGITIMATE) {
-      whereClause += ' AND (ground_truth IS NULL OR ground_truth != "legitimate")';
+      whereClause += ' AND (ground_truth IS NULL OR ground_truth != \'legitimate\')';
     }
 
     // Fetch fraud logs within lookback period
@@ -268,8 +268,8 @@ const getHealthScoreTrend = (userId) => {
           COUNT(*) as count
         FROM fraud_logs
         WHERE user_id = ?
-          AND created_at >= datetime('now', ?)
-          AND (ground_truth IS NULL OR ground_truth != 'legitimate')
+          AND created_at >= datetime(\'now\', ?)
+          AND (ground_truth IS NULL OR ground_truth != \'legitimate\')
       `).get(userId, `-${period.days} days`);
 
       return {
