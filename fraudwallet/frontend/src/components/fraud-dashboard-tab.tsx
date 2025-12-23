@@ -73,6 +73,35 @@ interface UserStats {
   review_count: number
   critical_count: number
   high_count: number
+  simple_avg_risk_score?: number
+  health?: {
+    score: number
+    simpleAverage: number
+    improvement: number
+    transactionCount: number
+    method: string
+    dateRange?: {
+      oldest: string
+      newest: string
+      spanDays: number
+    }
+  }
+  recovery?: {
+    recovered: boolean
+    currentScore: number
+    targetScore: number
+    estimatedDays?: number
+    estimatedWeeks?: number
+    message?: string
+    advice?: string[]
+  }
+  trend?: Array<{
+    period: string
+    days: number
+    avgScore: number | null
+    transactionCount: number
+  }>
+  improving?: boolean
 }
 
 interface TopFlaggedUser {
@@ -535,6 +564,66 @@ export function FraudDashboardTab() {
                       ? "⚠️ Your account has moderate risk. Consider reviewing your transaction patterns."
                       : "🚨 Your account shows high risk activity. Please contact support if you need assistance."}
                   </p>
+                )}
+
+                {/* Health Regeneration Info */}
+                {userStats?.health && userStats.health.improvement > 0 && (
+                  <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                        Health Regeneration Active!
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-500 mb-2">
+                      Your score has improved by <strong>{userStats.health.improvement.toFixed(1)} points</strong> thanks to time-weighted decay.
+                      Old transactions matter less over time.
+                    </p>
+                    {userStats.simple_avg_risk_score && (
+                      <div className="text-xs text-muted-foreground">
+                        Simple average: {userStats.simple_avg_risk_score.toFixed(1)} → Time-weighted: {userStats.avg_risk_score.toFixed(1)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Recovery Estimate */}
+                {userStats?.recovery && !userStats.recovery.recovered && (userStats?.avg_risk_score || 0) > 20 && (
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                        Recovery Timeline
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-500 mb-2">
+                      {userStats.recovery.message}
+                    </p>
+                    {userStats.recovery.estimatedDays && (
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Estimated time to reach "Good" health (score ≤20): <strong>~{userStats.recovery.estimatedWeeks} weeks</strong>
+                      </div>
+                    )}
+                    {userStats.recovery.advice && userStats.recovery.advice.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="text-xs font-medium text-blue-700 dark:text-blue-400">How to improve:</div>
+                        {userStats.recovery.advice.map((tip, idx) => (
+                          <div key={idx} className="text-xs text-muted-foreground flex items-start gap-1">
+                            <span className="text-blue-500">•</span>
+                            <span>{tip}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Trend Indicator */}
+                {userStats?.improving && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-green-600 dark:text-green-500">
+                    <TrendingUp className="h-3 w-3" />
+                    <span>Your health is improving over time!</span>
+                  </div>
                 )}
               </div>
             </Card>

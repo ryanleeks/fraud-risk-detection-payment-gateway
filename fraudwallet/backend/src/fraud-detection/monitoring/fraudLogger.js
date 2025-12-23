@@ -2,6 +2,7 @@
 // Logs all fraud checks for analysis and metrics
 
 const db = require('../../database');
+const healthRegeneration = require('../utils/healthRegeneration');
 
 /**
  * Log a fraud check result
@@ -112,6 +113,7 @@ const logFraudCheck = async (transaction, fraudResult) => {
 
 /**
  * Get fraud statistics for a specific user
+ * NOW WITH TIME-WEIGHTED HEALTH REGENERATION!
  * @param {number} userId - User ID
  * @returns {Object} User fraud statistics
  */
@@ -130,7 +132,46 @@ const getUserStats = async (userId) => {
       WHERE user_id = ?
     `).get(userId);
 
-    return stats || {};
+    // Calculate time-weighted health score (NEW!)
+    const healthData = healthRegeneration.calculateTimeWeightedHealthScore(userId);
+
+    // Get health recovery estimate
+    const recoveryEstimate = healthRegeneration.getHealthRecoveryEstimate(userId, 20);
+
+    // Get health trend
+    const healthTrend = healthRegeneration.getHealthScoreTrend(userId);
+
+    // Combine traditional stats with new health data
+    return {
+      ...stats,
+      // Replace simple average with time-weighted health score
+      avg_risk_score: healthData.healthScore || stats.avg_risk_score || 0,
+      // Keep original simple average for comparison
+      simple_avg_risk_score: stats.avg_risk_score || 0,
+      // Add health regeneration data
+      health: {
+        score: healthData.healthScore,
+        simpleAverage: healthData.simpleAverage,
+        improvement: healthData.improvement, // How much better than simple average
+        transactionCount: healthData.transactionCount,
+        method: healthData.method,
+        dateRange: healthData.dateRange,
+        config: healthData.config
+      },
+      // Add recovery estimate
+      recovery: {
+        recovered: recoveryEstimate.recovered,
+        currentScore: recoveryEstimate.currentScore,
+        targetScore: recoveryEstimate.targetScore,
+        estimatedDays: recoveryEstimate.estimatedDays,
+        estimatedWeeks: recoveryEstimate.estimatedWeeks,
+        message: recoveryEstimate.message,
+        advice: recoveryEstimate.advice
+      },
+      // Add trend data
+      trend: healthTrend.trend,
+      improving: healthTrend.improving
+    };
   } catch (error) {
     console.error('Get user stats error:', error);
     return {};

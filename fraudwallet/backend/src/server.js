@@ -127,6 +127,11 @@ app.post('/api/fraud/money/:transactionId/release', verifyAdminToken, fraudAPI.a
 app.post('/api/fraud/money/:transactionId/return', verifyAdminToken, fraudAPI.adminReturnMoney);
 app.post('/api/fraud/money/:transactionId/confiscate', verifyAdminToken, fraudAPI.adminConfiscateMoney);
 
+// Health regeneration routes
+app.get('/api/fraud/health/config', verifyToken, fraudAPI.getHealthConfig);
+app.get('/api/fraud/health/recovery', verifyToken, fraudAPI.getHealthRecoveryInfo);
+app.get('/api/fraud/health/trend', verifyToken, fraudAPI.getHealthTrend);
+
 // Admin routes (Admin only)
 const adminAPI = require('./adminAPI');
 app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);
