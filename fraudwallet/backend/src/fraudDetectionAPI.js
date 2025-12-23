@@ -4,6 +4,7 @@
 const fraudDetection = require('./fraud-detection');
 const fraudLogger = require('./fraud-detection/monitoring/fraudLogger');
 const academicMetrics = require('./fraud-detection/monitoring/academicMetrics');
+const healthRegeneration = require('./fraud-detection/utils/healthRegeneration');
 const db = require('./database');
 const wallet = require('./wallet');
 
@@ -1311,6 +1312,77 @@ const adminConfiscateMoney = async (req, res) => {
   }
 };
 
+/**
+ * Get health regeneration configuration (admin only)
+ * Returns current decay parameters and settings
+ */
+const getHealthConfig = async (req, res) => {
+  try {
+    const config = healthRegeneration.getConfiguration();
+
+    res.status(200).json({
+      success: true,
+      config: config
+    });
+  } catch (error) {
+    console.error('Get health config error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching health regeneration configuration'
+    });
+  }
+};
+
+/**
+ * Get detailed health recovery information for current user
+ * Includes recovery estimate and advice
+ */
+const getHealthRecoveryInfo = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { targetScore = 20 } = req.query;
+
+    const recoveryEstimate = healthRegeneration.getHealthRecoveryEstimate(
+      userId,
+      parseInt(targetScore)
+    );
+
+    res.status(200).json({
+      success: true,
+      recovery: recoveryEstimate
+    });
+  } catch (error) {
+    console.error('Get health recovery info error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching health recovery information'
+    });
+  }
+};
+
+/**
+ * Get health score trend over time for current user
+ * Shows improvement or decline in different time windows
+ */
+const getHealthTrend = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const trendData = healthRegeneration.getHealthScoreTrend(userId);
+
+    res.status(200).json({
+      success: true,
+      trend: trendData
+    });
+  } catch (error) {
+    console.error('Get health trend error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching health trend'
+    });
+  }
+};
+
 module.exports = {
   getUserDashboardMetrics,
   getUserFraudStats,
@@ -1348,5 +1420,9 @@ module.exports = {
   getHeldTransactions,
   adminReleaseMoney,
   adminReturnMoney,
-  adminConfiscateMoney
+  adminConfiscateMoney,
+  // Health regeneration endpoints
+  getHealthConfig,
+  getHealthRecoveryInfo,
+  getHealthTrend
 };
