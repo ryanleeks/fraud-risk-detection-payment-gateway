@@ -1,7 +1,7 @@
 // Wallet and Stripe payment management
 const db = require('./database');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const fraudDetection = require('./fraud-detection');
+const fraudDetection = require('./fraudServiceClient'); // Changed to call fraud microservice
 
 // Amount validation constants
 const AMOUNT_LIMITS = {

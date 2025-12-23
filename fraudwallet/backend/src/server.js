@@ -72,8 +72,8 @@ app.post('/api/wallet/add-funds', verifyToken, wallet.createPaymentIntent);
 app.get('/api/wallet/transactions', verifyToken, wallet.getTransactionHistory);
 app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 
-// Fraud Detection routes (protected)
-const fraudAPI = require('./fraudDetectionAPI');
+// Fraud Detection routes (protected) - Now proxied to fraud microservice
+const fraudAPI = require('./fraudDetectionAPIProxy'); // Changed to proxy
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
 app.get('/api/fraud/recent-logs', verifyToken, fraudAPI.getRecentFraudLogs);
