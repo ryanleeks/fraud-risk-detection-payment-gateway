@@ -6,8 +6,9 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label";
-import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX, Copy, QrCode } from "lucide-react"
+import { Settings, Bell, Shield, HelpCircle, LogOut, ChevronRight, UserX, Copy, QrCode, Lock } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
+import { PasscodeDialog } from "@/components/passcode-dialog"
 
 export function ProfileTab() {
   const router = useRouter()
@@ -38,6 +39,13 @@ export function ProfileTab() {
   const [showDisableForm, setShowDisableForm] = useState(false)
   const [disableCodeSent, setDisableCodeSent] = useState(false)
 
+  // Passcode states
+  const [hasPasscode, setHasPasscode] = useState(false)
+  const [showPasscodeDialog, setShowPasscodeDialog] = useState(false)
+  const [passcodeMode, setPasscodeMode] = useState<"setup" | "change" | "verify">("setup")
+  const [setupPassword, setSetupPassword] = useState("")
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
+
   // Load user data from localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -46,6 +54,28 @@ export function ProfileTab() {
       setUser(userData)
       setFullName(userData.fullName || "")
     }
+  }, [])
+
+  // Fetch passcode status
+  useEffect(() => {
+    const fetchPasscodeStatus = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        const response = await fetch("http://localhost:8080/api/user/passcode/status", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+        const data = await response.json()
+        if (data.success) {
+          setHasPasscode(data.hasPasscode)
+        }
+      } catch (error) {
+        console.error("Failed to fetch passcode status:", error)
+      }
+    }
+
+    fetchPasscodeStatus()
   }, [])
 
   // Get user initials for avatar
@@ -463,6 +493,85 @@ export function ProfileTab() {
     }
   }
 
+  // Passcode handlers
+  const handleSetupPasscode = () => {
+    setPasscodeMode("setup")
+    setShowPasswordPrompt(true)
+  }
+
+  const handleChangePasscode = () => {
+    setPasscodeMode("change")
+    setShowPasscodeDialog(true)
+  }
+
+  const handlePasscodeSubmit = async (passcode: string, oldPasscode?: string) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (passcodeMode === "setup") {
+        // Setup requires password verification
+        const response = await fetch("http://localhost:8080/api/user/passcode/set", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            passcode,
+            currentPassword: setupPassword
+          })
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          setHasPasscode(true)
+          setSuccessMessage("Transaction passcode set successfully!")
+          return { success: true }
+        } else {
+          return { success: false, message: data.message }
+        }
+      } else if (passcodeMode === "change") {
+        // Change requires old and new passcode
+        const response = await fetch("http://localhost:8080/api/user/passcode/change", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            oldPasscode,
+            newPasscode: passcode
+          })
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          setSuccessMessage("Transaction passcode changed successfully!")
+          return { success: true }
+        } else {
+          return { success: false, message: data.message, locked: response.status === 429 }
+        }
+      }
+
+      return { success: false, message: "Invalid mode" }
+    } catch (error) {
+      console.error("Passcode operation error:", error)
+      return { success: false, message: "Failed to process passcode" }
+    }
+  }
+
+  const handlePasswordSubmit = () => {
+    if (!setupPassword) {
+      setError("Password is required")
+      return
+    }
+    setShowPasswordPrompt(false)
+    setShowPasscodeDialog(true)
+    setError("")
+  }
+
   const menuItems = [
     { icon: Settings, label: "Account Settings", description: "Manage your account" },
     { icon: Bell, label: "Notifications", description: "Alerts and updates" },
@@ -562,9 +671,9 @@ export function ProfileTab() {
       </Button>
 
       {/* App Version */}
-      <p className="text-center text-xs text-muted-foreground">Copyright © 2025 Ryan Lee Khang Sern. All rights reserved.</p>
+      <p className="text-center text-xs text-muted-foreground">Copyright © 2025-2026 Ryan Lee Khang Sern. All rights reserved.</p>
       <p className="text-center text-xs text-muted-foreground">For FYP@APU purpose.</p>
-      <p className="text-center text-xs text-muted-foreground">Version Alpha Release [Dev]</p>
+      <p className="text-center text-xs text-muted-foreground">Version Alpha Late_Dec_2025 (Unreleased)</p>
 
       {/* Edit Profile Modal - Name Only */}
       {showEditModal && (
@@ -998,6 +1107,51 @@ export function ProfileTab() {
                 </>
               )}
 
+              {/* Transaction Passcode Section */}
+              <div className="border-t border-border" />
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    Transaction Passcode
+                  </h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Secure your transactions with a 6-digit passcode
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">
+                      Passcode is {hasPasscode ? "Set" : "Not Set"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {hasPasscode
+                        ? "Required for top-up, transfer, and split payments"
+                        : "Set up a passcode to secure your transactions"}
+                    </p>
+                  </div>
+                </div>
+
+                {hasPasscode ? (
+                  <Button
+                    variant="outline"
+                    onClick={handleChangePasscode}
+                    className="w-full"
+                  >
+                    Change Passcode
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSetupPasscode}
+                    className="w-full"
+                  >
+                    Set Up Passcode
+                  </Button>
+                )}
+              </div>
+
               {/* Close Button */}
               <Button
                 variant="outline"
@@ -1180,6 +1334,72 @@ export function ProfileTab() {
           </div>
         </div>
       )}
+
+      {/* Password Prompt for Passcode Setup */}
+      {showPasswordPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="mb-4 text-xl font-bold">Verify Your Password</h3>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <p className="mb-4 text-sm text-muted-foreground">
+              Enter your password to set up your transaction passcode
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="setup-password">Password</Label>
+                <Input
+                  id="setup-password"
+                  type="password"
+                  value={setupPassword}
+                  onChange={(e) => setSetupPassword(e.target.value)}
+                  placeholder="Enter your password"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handlePasswordSubmit}
+                  disabled={!setupPassword}
+                  className="flex-1"
+                >
+                  Continue
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowPasswordPrompt(false)
+                    setSetupPassword("")
+                    setError("")
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Passcode Dialog */}
+      <PasscodeDialog
+        open={showPasscodeDialog}
+        onOpenChange={(open) => {
+          setShowPasscodeDialog(open)
+          if (!open) {
+            setSetupPassword("")
+          }
+        }}
+        mode={passcodeMode}
+        onSubmit={handlePasscodeSubmit}
+      />
 
       {/* QR Code Modal */}
       {showQRModal && user?.accountId && (

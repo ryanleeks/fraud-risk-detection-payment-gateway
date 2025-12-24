@@ -8,6 +8,7 @@ import { ProfileTab } from "@/components/profile-tab"
 import { FraudDashboardTab } from "@/components/fraud-dashboard-tab"
 import { Home, Send, Users, User, Shield } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
+import { TimezoneProvider } from "@/contexts/TimezoneContext"
 
 export default function WalletApp() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "payment" | "splitpay" | "fraud" | "profile">("dashboard")
@@ -32,6 +33,7 @@ export default function WalletApp() {
   }
 
   return (
+    <TimezoneProvider>
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <div className="w-full max-w-md">
         {/* Mobile App Container */}
@@ -47,7 +49,7 @@ export default function WalletApp() {
           </div>
 
           {/* App Content */}
-          <div className="h-[600px] overflow-y-auto bg-background">
+          <div className="h-[600px] overflow-y-auto bg-background px-4 py-6">
             {activeTab === "dashboard" && <DashboardTab />}
             {activeTab === "payment" && <PaymentTab />}
             {activeTab === "splitpay" && <SplitPayTab />}
@@ -118,5 +120,6 @@ export default function WalletApp() {
         </div>
       </div>
     </div>
+    </TimezoneProvider>
   )
 }

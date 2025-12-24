@@ -5,11 +5,14 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Send, DollarSign, Copy, QrCode } from "lucide-react"
+import { Send, DollarSign, Copy, QrCode, AlertCircle } from "lucide-react"
 import { QRCodeCanvas } from "qrcode.react"
 import { validateAmount } from "@/utils/amountValidation"
+import { PasscodeDialog } from "@/components/passcode-dialog"
+import { useRouter } from "next/navigation"
 
 export function PaymentTab() {
+  const router = useRouter()
   const [amount, setAmount] = useState("")
   const [recipient, setRecipient] = useState("")
   const [note, setNote] = useState("")
@@ -21,6 +24,8 @@ export function PaymentTab() {
   const [sendLoading, setSendLoading] = useState(false)
   const [sendError, setSendError] = useState("")
   const [sendSuccess, setSendSuccess] = useState(false)
+  const [showPasscodeDialog, setShowPasscodeDialog] = useState(false)
+  const [showPasscodeSetupAlert, setShowPasscodeSetupAlert] = useState(false)
 
   // Load user data from localStorage
   useEffect(() => {
@@ -90,7 +95,13 @@ export function PaymentTab() {
       return
     }
 
+    // Show passcode dialog to verify before sending
+    setShowPasscodeDialog(true)
+  }
+
+  const handlePasscodeVerification = async (passcode: string) => {
     // Use the validated and rounded amount
+    const validation = validateAmount(amount)
     const validatedAmount = validation.value
 
     setSendLoading(true)
@@ -107,13 +118,46 @@ export function PaymentTab() {
         body: JSON.stringify({
           recipientId: recipientData.id,
           amount: validatedAmount,
-          note: note || undefined
+          note: note || undefined,
+          passcode
         })
       })
 
       const data = await response.json()
 
       if (data.success) {
+        // Check if transaction was blocked or flagged for review
+        if (data.blocked) {
+          setSendError("")
+          setSendSuccess(false)
+          // Show blocked transaction message with fraud details
+          const fraudInfo = data.fraudDetection
+          const message = `⚠️ Transaction Blocked\n\n` +
+            `Your transaction of RM${amount} to ${recipientData.fullName} has been blocked due to suspicious activity.\n\n` +
+            `Risk Score: ${fraudInfo?.riskScore || 'N/A'}/100 (${fraudInfo?.riskLevel || 'N/A'})\n` +
+            `Reason: ${fraudInfo?.reason || 'Multiple fraud indicators detected'}\n\n` +
+            `Your money (RM${amount}) has been held and will not be credited to the recipient.\n\n` +
+            `You can appeal this decision in the SecureTrack tab. If approved, your money will be returned.`
+
+          alert(message)
+
+          // Refresh to update balance and show held transaction
+          window.location.reload()
+          return { success: true, blocked: true }
+        } else if (data.review) {
+          setSendError("")
+          setSendSuccess(false)
+          // Show review message
+          alert(`⚠️ Transaction Under Review\n\n` +
+            `Your transaction of RM${amount} to ${recipientData.fullName} has been flagged for manual review.\n\n` +
+            `Your money is temporarily held and will be reviewed within 72 hours.\n\n` +
+            `You can check the status in your wallet dashboard.`)
+
+          window.location.reload()
+          return { success: true, review: true }
+        }
+
+        // Normal successful transaction
         setSendSuccess(true)
         setSendError("")
         // Reset form
@@ -125,16 +169,25 @@ export function PaymentTab() {
         alert(`Successfully sent RM${amount} to ${recipientData.fullName}!`)
         // Optionally refresh the page to update balance
         window.location.reload()
+        return { success: true }
       } else {
+        // Check if user needs to set up passcode
+        if (data.requiresPasscodeSetup) {
+          setShowPasscodeSetupAlert(true)
+          setSendLoading(false)
+          return { success: false, message: data.message }
+        }
         setSendError(data.message || "Transfer failed")
         setSendSuccess(false)
+        setSendLoading(false)
+        return { success: false, message: data.message, locked: response.status === 429 }
       }
     } catch (err) {
       console.error("Send money error:", err)
       setSendError("Unable to connect to server")
       setSendSuccess(false)
-    } finally {
       setSendLoading(false)
+      return { success: false, message: "Unable to connect to server" }
     }
   }
 
@@ -288,6 +341,53 @@ export function PaymentTab() {
           {sendLoading ? "Sending..." : `Send RM${amount || "0.00"}`}
         </Button>
       </div>
+
+      {/* Passcode Dialog */}
+      <PasscodeDialog
+        open={showPasscodeDialog}
+        onOpenChange={setShowPasscodeDialog}
+        mode="verify"
+        onSubmit={handlePasscodeVerification}
+        title="Verify Transaction"
+        description={`Enter your passcode to send RM${amount || "0.00"} to ${recipientData?.fullName || "recipient"}`}
+      />
+
+      {/* Passcode Setup Alert */}
+      {showPasscodeSetupAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+              </div>
+              <h3 className="text-xl font-bold">Passcode Required</h3>
+            </div>
+
+            <p className="mb-6 text-sm text-muted-foreground">
+              You need to set up a transaction passcode before you can send money. This adds an extra layer of security to your transactions.
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowPasscodeSetupAlert(false)
+                  router.push("/?tab=profile")
+                }}
+                className="flex-1"
+              >
+                Set Up Passcode
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasscodeSetupAlert(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR Code Modal */}
       {showQRModal && user?.accountId && (

@@ -5,11 +5,15 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle, ChevronDown, ChevronUp, Calendar } from "lucide-react"
+import { Users, DollarSign, Plus, X, Check, Clock, CheckCircle, ChevronDown, ChevronUp, Calendar, AlertCircle } from "lucide-react"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
+import { PasscodeDialog } from "@/components/passcode-dialog"
+import { useRouter } from "next/navigation"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 export function SplitPayTab() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [totalAmount, setTotalAmount] = useState("")
   const [title, setTitle] = useState("")
@@ -23,6 +27,10 @@ export function SplitPayTab() {
   const [mySplits, setMySplits] = useState<any[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [expandedSplitId, setExpandedSplitId] = useState<number | null>(null)
+  const [showPasscodeDialog, setShowPasscodeDialog] = useState(false)
+  const [showPasscodeSetupAlert, setShowPasscodeSetupAlert] = useState(false)
+  const [selectedSplitId, setSelectedSplitId] = useState<number | null>(null)
+  const [selectedSplitAmount, setSelectedSplitAmount] = useState<number>(0)
 
   // Load my split payments
   const loadMySplits = async () => {
@@ -194,8 +202,15 @@ export function SplitPayTab() {
     }
   }
 
-  // Pay my share
-  const handlePayShare = async (splitId: number) => {
+  // Pay my share - Show passcode dialog
+  const handlePayShare = async (splitId: number, amount: number) => {
+    setSelectedSplitId(splitId)
+    setSelectedSplitAmount(amount)
+    setShowPasscodeDialog(true)
+  }
+
+  // Handle passcode verification and pay share
+  const handlePasscodeVerification = async (passcode: string) => {
     try {
       const token = localStorage.getItem("token")
 
@@ -206,7 +221,8 @@ export function SplitPayTab() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          splitPaymentId: splitId
+          splitPaymentId: selectedSplitId,
+          passcode
         })
       })
 
@@ -215,12 +231,20 @@ export function SplitPayTab() {
       if (data.success) {
         alert("Payment recorded successfully!")
         loadMySplits()
+        return { success: true }
       } else {
+        // Check if user needs to set up passcode
+        if (data.requiresPasscodeSetup) {
+          setShowPasscodeSetupAlert(true)
+          return { success: false, message: data.message }
+        }
         alert(data.message || "Failed to record payment")
+        return { success: false, message: data.message, locked: response.status === 429 }
       }
     } catch (err) {
       console.error("Pay share error:", err)
       alert("Unable to connect to server")
+      return { success: false, message: "Unable to connect to server" }
     }
   }
 
@@ -486,8 +510,12 @@ export function SplitPayTab() {
                   </div>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    <span>{formatDateShort(split.created_at)}</span>
-                    <span className="text-xs">• {formatDateTime(split.created_at)}</span>
+                    <TimeDisplay
+                      utcDate={split.created_at}
+                      format="full"
+                      showBadge={true}
+                      className="text-xs"
+                    />
                   </div>
                 </div>
                 <div className="text-right">
@@ -565,13 +593,25 @@ export function SplitPayTab() {
                         {participant.responded_at && (
                           <div className="flex items-center gap-1">
                             <Check className="h-3 w-3" />
-                            <span>Responded: {formatDateTime(participant.responded_at)}</span>
+                            <span>Responded: </span>
+                            <TimeDisplay
+                              utcDate={participant.responded_at}
+                              format="full"
+                              showBadge={true}
+                              className="text-xs"
+                            />
                           </div>
                         )}
                         {participant.paid === 1 && participant.paid_at && (
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
-                            <span>Paid: {formatDateTime(participant.paid_at)}</span>
+                            <span>Paid: </span>
+                            <TimeDisplay
+                              utcDate={participant.paid_at}
+                              format="full"
+                              showBadge={true}
+                              className="text-xs"
+                            />
                           </div>
                         )}
                         {participant.status === 'pending' && (
@@ -616,7 +656,7 @@ export function SplitPayTab() {
                     You accepted this request
                   </div>
                   <Button
-                    onClick={() => handlePayShare(split.id)}
+                    onClick={() => handlePayShare(split.id, split.amount_per_person)}
                     className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                     size="sm"
                   >
@@ -648,6 +688,53 @@ export function SplitPayTab() {
           ))
         )}
       </div>
+
+      {/* Passcode Dialog */}
+      <PasscodeDialog
+        open={showPasscodeDialog}
+        onOpenChange={setShowPasscodeDialog}
+        mode="verify"
+        onSubmit={handlePasscodeVerification}
+        title="Verify Transaction"
+        description={`Enter your passcode to pay RM${selectedSplitAmount?.toFixed(2) || "0.00"} for your share`}
+      />
+
+      {/* Passcode Setup Alert */}
+      {showPasscodeSetupAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+              </div>
+              <h3 className="text-xl font-bold">Passcode Required</h3>
+            </div>
+
+            <p className="mb-6 text-sm text-muted-foreground">
+              You need to set up a transaction passcode before you can pay split bills. This adds an extra layer of security to your transactions.
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowPasscodeSetupAlert(false)
+                  router.push("/?tab=profile")
+                }}
+                className="flex-1"
+              >
+                Set Up Passcode
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasscodeSetupAlert(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )

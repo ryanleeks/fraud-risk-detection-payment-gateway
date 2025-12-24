@@ -75,7 +75,7 @@ const signup = async (req, res) => {
 
     // Create JWT token (like a digital passport)
     const token = jwt.sign(
-      { userId, email },
+      { userId, email, role: 'user' },
       process.env.JWT_SECRET || 'default-secret-key',
       { expiresIn: '7d' } // Token expires in 7 days
     );
@@ -92,7 +92,8 @@ const signup = async (req, res) => {
         email,
         phoneNumber: phoneValidation.formatted,
         twofaEnabled: false,
-        twofaMethod: 'email'
+        twofaMethod: 'email',
+        role: 'user'
       }
     });
 
@@ -199,7 +200,7 @@ const login = async (req, res) => {
 
     // No 2FA - proceed with normal login
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role: user.role || 'user' },
       process.env.JWT_SECRET || 'default-secret-key',
       { expiresIn: '7d' }
     );
@@ -216,7 +217,8 @@ const login = async (req, res) => {
         email: user.email,
         phoneNumber: user.phone_number,
         twofaEnabled: user.twofa_enabled,
-        twofaMethod: user.twofa_method
+        twofaMethod: user.twofa_method,
+        role: user.role || 'user'
       }
     });
 
@@ -267,7 +269,7 @@ const verify2FA = async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role: user.role || 'user' },
       process.env.JWT_SECRET || 'default-secret-key',
       { expiresIn: '7d' }
     );
@@ -284,7 +286,8 @@ const verify2FA = async (req, res) => {
         email: user.email,
         phoneNumber: user.phone_number,
         twofaEnabled: user.twofa_enabled,
-        twofaMethod: user.twofa_method
+        twofaMethod: user.twofa_method,
+        role: user.role || 'user'
       }
     });
 

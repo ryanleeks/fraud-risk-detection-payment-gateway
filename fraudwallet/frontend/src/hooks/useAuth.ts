@@ -7,11 +7,12 @@ import { useRouter } from "next/navigation"
  * Custom hook for authentication
  * Checks if user is logged in and redirects if not
  */
-export function useAuth() {
+export function useAuth(requireAdmin: boolean = false) {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     // Check if user is logged in
@@ -29,6 +30,15 @@ export function useAuth() {
       const userData = JSON.parse(storedUser)
       setUser(userData)
       setIsAuthenticated(true)
+
+      // Check if user is admin
+      const userIsAdmin = userData.role === 'admin'
+      setIsAdmin(userIsAdmin)
+
+      // If admin is required but user is not admin, redirect to home
+      if (requireAdmin && !userIsAdmin) {
+        router.push("/")
+      }
     } catch (error) {
       console.error("Error parsing user data:", error)
       // Invalid data - clear and redirect to login
@@ -38,7 +48,7 @@ export function useAuth() {
     } finally {
       setIsLoading(false)
     }
-  }, [router])
+  }, [router, requireAdmin])
 
   const logout = () => {
     localStorage.removeItem("token")
@@ -52,6 +62,7 @@ export function useAuth() {
     isAuthenticated,
     isLoading,
     user,
+    isAdmin,
     logout
   }
 }

@@ -1,5 +1,7 @@
 // Split payment management
 const db = require('./database');
+const { hasPasscode, verifyPasscode } = require('./passcode');
+const fraudDetection = require('./fraud-detection');
 
 /**
  * CREATE SPLIT PAYMENT
@@ -253,7 +255,34 @@ const respondToSplitPayment = async (req, res) => {
 const payMyShare = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { splitPaymentId } = req.body;
+    const { splitPaymentId, passcode } = req.body;
+
+    // Check if user has passcode setup
+    if (!hasPasscode(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You must set up a transaction passcode before paying split bills',
+        requiresPasscodeSetup: true
+      });
+    }
+
+    // Verify passcode
+    if (!passcode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction passcode is required'
+      });
+    }
+
+    const passcodeVerification = await verifyPasscode(userId, passcode);
+    if (!passcodeVerification.success) {
+      return res.status(passcodeVerification.locked ? 429 : 401).json({
+        success: false,
+        message: passcodeVerification.message,
+        locked: passcodeVerification.locked,
+        remainingAttempts: passcodeVerification.remainingAttempts
+      });
+    }
 
     if (!splitPaymentId) {
       return res.status(400).json({
@@ -320,9 +349,54 @@ const payMyShare = async (req, res) => {
     // Get creator info
     const creator = db.prepare('SELECT full_name FROM users WHERE id = ?').get(splitPayment.creator_id);
 
+    // ==========================================
+    // FRAUD DETECTION CHECK
+    // ==========================================
+    const fraudCheck = await fraudDetection.analyzeFraudRisk({
+      userId: userId,
+      amount: splitPayment.amount_per_person,
+      type: 'split_payment_sent',
+      recipientId: splitPayment.creator_id,
+      ipAddress: req.ip,
+      recipientData: {
+        id: splitPayment.creator_id,
+        name: creator.full_name,
+        accountId: null
+      }
+    }, {
+      walletBalance: payer.wallet_balance,
+      accountCreated: null
+    });
+
+    // Log fraud check result
+    console.log(`🔍 Fraud Check (SplitPay) - User ${userId}: Score ${fraudCheck.riskScore}/100 (${fraudCheck.riskLevel}) - Action: ${fraudCheck.action}`);
+
+    // Determine transaction status based on fraud detection
+    const isBlocked = fraudCheck.action === 'BLOCK';
+    const isReview = fraudCheck.action === 'REVIEW';
+
+    // For blocked/high-risk splitpay transactions, we'll hold the money
+    const shouldHoldMoney = isBlocked || isReview;
+    const moneyStatus = shouldHoldMoney ? 'held' : 'completed';
+
+    // Calculate hold duration (72 hours for review, 168 hours/7 days for blocked)
+    let heldUntil = null;
+    if (shouldHoldMoney) {
+      heldUntil = new Date();
+      heldUntil.setHours(heldUntil.getHours() + (isBlocked ? 168 : 72));
+    }
+
+    if (fraudCheck.action === 'REVIEW') {
+      console.log(`⚠️  HIGH RISK SPLITPAY TRANSACTION - Flagged for review: User ${userId}, Amount: RM${splitPayment.amount_per_person.toFixed(2)}`);
+    }
+
+    if (isBlocked) {
+      console.log(`🔒 BLOCKED SPLITPAY TRANSACTION - Money will be held: User ${userId}, Amount: RM${splitPayment.amount_per_person.toFixed(2)}`);
+    }
+
     // Perform payment in a transaction
     const payment = db.transaction(() => {
-      // Deduct from participant
+      // Deduct from participant (always happens)
       db.prepare(`
         UPDATE users
         SET wallet_balance = wallet_balance - ?,
@@ -330,13 +404,15 @@ const payMyShare = async (req, res) => {
         WHERE id = ?
       `).run(splitPayment.amount_per_person, userId);
 
-      // Add to creator
-      db.prepare(`
-        UPDATE users
-        SET wallet_balance = wallet_balance + ?,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(splitPayment.amount_per_person, splitPayment.creator_id);
+      // Only add to creator if NOT holding money
+      if (!shouldHoldMoney) {
+        db.prepare(`
+          UPDATE users
+          SET wallet_balance = wallet_balance + ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(splitPayment.amount_per_person, splitPayment.creator_id);
+      }
 
       // Mark as paid
       db.prepare(`
@@ -345,16 +421,45 @@ const payMyShare = async (req, res) => {
         WHERE split_payment_id = ? AND user_id = ?
       `).run(splitPaymentId, userId);
 
-      // Create transaction records
-      db.prepare(`
-        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
-        VALUES (?, 'split_payment_sent', ?, 'completed', ?, ?)
-      `).run(userId, splitPayment.amount_per_person, `Split payment: ${splitPayment.title}`, splitPayment.creator_id);
+      // Create transaction records with fraud detection fields
+      const description = `Split payment: ${splitPayment.title}`;
+      const recipientDescription = `Split payment: ${splitPayment.title} from ${payer.full_name}`;
+      const recipientStatus = shouldHoldMoney ? 'pending' : 'completed';
 
+      // Sender transaction record
       db.prepare(`
-        INSERT INTO transactions (user_id, type, amount, status, description, recipient_id)
-        VALUES (?, 'split_payment_received', ?, 'completed', ?, ?)
-      `).run(splitPayment.creator_id, splitPayment.amount_per_person, `Split payment: ${splitPayment.title} from ${payer.full_name}`, userId);
+        INSERT INTO transactions (
+          user_id, type, amount, status, description, recipient_id,
+          money_status, held_until, fraud_log_id
+        )
+        VALUES (?, 'split_payment_sent', ?, 'completed', ?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        splitPayment.amount_per_person,
+        description,
+        splitPayment.creator_id,
+        moneyStatus,
+        heldUntil ? heldUntil.toISOString() : null,
+        fraudCheck.logId || null
+      );
+
+      // Recipient transaction record
+      db.prepare(`
+        INSERT INTO transactions (
+          user_id, type, amount, status, description, recipient_id,
+          money_status, held_until, fraud_log_id
+        )
+        VALUES (?, 'split_payment_received', ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        splitPayment.creator_id,
+        splitPayment.amount_per_person,
+        recipientStatus,
+        recipientDescription,
+        userId,
+        moneyStatus,
+        heldUntil ? heldUntil.toISOString() : null,
+        fraudCheck.logId || null
+      );
     });
 
     // Execute the transaction
@@ -377,13 +482,25 @@ const payMyShare = async (req, res) => {
       `).run(splitPaymentId);
     }
 
+    // Prepare response with fraud detection info
+    const responseMessage = shouldHoldMoney
+      ? `Payment processed but flagged for security review. Money will be held until admin verification.`
+      : 'Payment recorded successfully';
+
     res.status(200).json({
       success: true,
-      message: 'Payment recorded successfully',
-      amountPaid: splitPayment.amount_per_person
+      message: responseMessage,
+      amountPaid: splitPayment.amount_per_person,
+      fraudDetection: {
+        riskScore: fraudCheck.riskScore,
+        riskLevel: fraudCheck.riskLevel,
+        action: fraudCheck.action,
+        moneyHeld: shouldHoldMoney,
+        heldUntil: heldUntil ? heldUntil.toISOString() : null
+      }
     });
 
-    console.log(`✅ User ${userId} paid RM${splitPayment.amount_per_person.toFixed(2)} for split payment ${splitPaymentId}`);
+    console.log(`✅ User ${userId} paid RM${splitPayment.amount_per_person.toFixed(2)} for split payment ${splitPaymentId}${shouldHoldMoney ? ' (HELD FOR REVIEW)' : ''}`);
 
   } catch (error) {
     console.error('❌ Pay share error:', error);

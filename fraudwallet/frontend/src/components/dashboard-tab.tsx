@@ -5,12 +5,15 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard } from "lucide-react"
+import { ArrowUpRight, ArrowDownLeft, TrendingUp, Wallet, Plus, X, CreditCard, AlertCircle } from "lucide-react"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js"
 import { validateAmount, formatAmount, AMOUNT_LIMITS } from "@/utils/amountValidation"
 import { usePullToRefresh } from "@/hooks/usePullToRefresh"
 import { PullToRefreshIndicator } from "@/components/ui/pull-to-refresh-indicator"
+import { PasscodeDialog } from "@/components/passcode-dialog"
+import { useRouter } from "next/navigation"
+import { TimeDisplay } from "@/components/TimeDisplay"
 
 // Initialize Stripe with publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "")
@@ -106,15 +109,19 @@ function StripePaymentForm({
 }
 
 export function DashboardTab() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [walletBalance, setWalletBalance] = useState<number>(0)
   const [transactions, setTransactions] = useState<any[]>([])
+  const [heldTransactions, setHeldTransactions] = useState<any[]>([])
   const [showAddFundsModal, setShowAddFundsModal] = useState(false)
   const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
+  const [showPasscodeDialog, setShowPasscodeDialog] = useState(false)
+  const [showPasscodeSetupAlert, setShowPasscodeSetupAlert] = useState(false)
 
   // Load wallet balance and transactions
   const loadWalletData = async () => {
@@ -151,6 +158,17 @@ export function DashboardTab() {
       if (transactionsData.success) {
         setTransactions(transactionsData.transactions)
       }
+
+      // Fetch held transactions
+      const heldResponse = await fetch("http://localhost:8080/api/wallet/held-transactions", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      const heldData = await heldResponse.json()
+      if (heldData.success) {
+        setHeldTransactions(heldData.heldTransactions)
+      }
     } catch (err) {
       console.error("Load wallet data error:", err)
     }
@@ -172,7 +190,7 @@ export function DashboardTab() {
     loadWalletData()
   }, [])
 
-  // Handle add funds - Create payment intent
+  // Handle add funds button click - Show passcode dialog
   const handleAddFunds = async () => {
     // Validate amount
     const validation = validateAmount(amount, { minTopup: true })
@@ -182,7 +200,14 @@ export function DashboardTab() {
       return
     }
 
-    // Use the validated and rounded amount
+    // Show passcode dialog to verify before creating payment intent
+    setShowPasscodeDialog(true)
+  }
+
+  // Handle passcode verification and create payment intent
+  const handlePasscodeVerification = async (passcode: string) => {
+    // Validate amount again
+    const validation = validateAmount(amount, { minTopup: true })
     const validatedAmount = validation.value
 
     setLoading(true)
@@ -191,14 +216,17 @@ export function DashboardTab() {
     try {
       const token = localStorage.getItem("token")
 
-      // Create payment intent
+      // Create payment intent with passcode
       const response = await fetch("http://localhost:8080/api/wallet/add-funds", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: validatedAmount })
+        body: JSON.stringify({
+          amount: validatedAmount,
+          passcode
+        })
       })
 
       const data = await response.json()
@@ -207,14 +235,33 @@ export function DashboardTab() {
         // Store client secret to show Stripe payment form
         setClientSecret(data.clientSecret)
         setPaymentIntentId(data.paymentIntentId)
+        return { success: true }
       } else {
+        // Check if user needs to set up passcode
+        if (data.requiresPasscodeSetup) {
+          setShowPasscodeSetupAlert(true)
+          setLoading(false)
+          return { success: false, message: data.message }
+        }
+
+        // Handle fraud detection blocking
+        if (response.status === 403 && data.fraudDetection) {
+          const fraudInfo = data.fraudDetection
+          const errorMsg = `⚠️ Security Alert: ${data.message}\n\nRisk Level: ${fraudInfo.riskLevel}\nReason: ${fraudInfo.reason || 'Suspicious activity detected'}`
+          setError(errorMsg)
+          setLoading(false)
+          return { success: false, message: errorMsg }
+        }
+
         setError(data.message || "Failed to create payment intent")
+        setLoading(false)
+        return { success: false, message: data.message, locked: response.status === 429 }
       }
     } catch (err) {
       console.error("Add funds error:", err)
       setError("Unable to connect to server")
-    } finally {
       setLoading(false)
+      return { success: false, message: "Unable to connect to server" }
     }
   }
 
@@ -335,6 +382,121 @@ export function DashboardTab() {
       </div>
       */}
 
+      {/* Held Transactions (Money in Escrow) */}
+      {heldTransactions.length > 0 && (
+        <div className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <h3 className="font-semibold">Money on Hold</h3>
+              <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full">
+                {heldTransactions.length}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {heldTransactions.map((transaction) => (
+              <Card key={transaction.id} className="p-4 border-amber-500/20 bg-amber-500/5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{transaction.description || "Transfer on hold"}</p>
+                      <TimeDisplay
+                        utcDate={transaction.created_at}
+                        format="full"
+                        showBadge={true}
+                        className="text-xs text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+                  <p className="font-semibold text-amber-600">
+                    RM {transaction.amount.toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Fraud Details */}
+                {transaction.risk_score && (
+                  <div className="mb-3 p-3 bg-background/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium">Risk Score</span>
+                      <span className={`text-xs font-semibold ${
+                        transaction.risk_level === 'CRITICAL' ? 'text-red-600' :
+                        transaction.risk_level === 'HIGH' ? 'text-orange-600' :
+                        'text-yellow-600'
+                      }`}>
+                        {transaction.risk_score}/100 - {transaction.risk_level}
+                      </span>
+                    </div>
+                    {transaction.ai_reasoning && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {transaction.ai_reasoning}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Expiration Info */}
+                {transaction.held_until && (
+                  <div className="mb-3 text-xs text-muted-foreground">
+                    <strong>Held until:</strong>{" "}
+                    <TimeDisplay
+                      utcDate={transaction.held_until}
+                      format="full"
+                      showBadge={false}
+                      className="inline"
+                    />
+                  </div>
+                )}
+
+                {/* Appeal Status / Action */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  {transaction.appeal_id ? (
+                    // Already appealed - show appeal status
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        transaction.appeal_status === 'pending' ? 'bg-blue-500/10 text-blue-600' :
+                        transaction.appeal_status === 'approved' ? 'bg-green-500/10 text-green-600' :
+                        'bg-red-500/10 text-red-600'
+                      }`}>
+                        Appeal: {transaction.appeal_status}
+                      </span>
+                    </div>
+                  ) : transaction.admin_review_status === 'pending' || !transaction.admin_review_status ? (
+                    // Waiting for admin review - can't appeal yet
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600">
+                        ⏳ Waiting for Admin Review
+                      </span>
+                    </div>
+                  ) : transaction.admin_review_status === 'fraud' ? (
+                    // Admin confirmed fraud - can appeal now
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => router.push('/?tab=securetrack')}
+                    >
+                      Appeal This Transaction
+                    </Button>
+                  ) : (
+                    // Admin marked as legitimate - should have been auto-released
+                    <span className="text-xs text-green-600">
+                      ✓ Cleared by Admin
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    Transaction #{transaction.id}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Recent Transactions */}
       <div>
         <div className="mb-4 flex items-center justify-between">
@@ -364,8 +526,13 @@ export function DashboardTab() {
                   </div>
                   <div>
                     <p className="font-medium">{transaction.description || "Transaction"}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(transaction.created_at)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    <TimeDisplay
+                      utcDate={transaction.created_at}
+                      format="full"
+                      showBadge={true}
+                      className="text-xs text-muted-foreground"
+                    />
+                    <span className={`text-xs px-2 py-0.5 rounded-full ml-2 ${
                       transaction.status === 'completed' ? 'bg-green-500/10 text-green-600' :
                       transaction.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' :
                       'bg-red-500/10 text-red-600'
@@ -485,6 +652,53 @@ export function DashboardTab() {
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Passcode Dialog */}
+      <PasscodeDialog
+        open={showPasscodeDialog}
+        onOpenChange={setShowPasscodeDialog}
+        mode="verify"
+        onSubmit={handlePasscodeVerification}
+        title="Verify Transaction"
+        description={`Enter your passcode to add RM${amount || "0.00"} to your wallet`}
+      />
+
+      {/* Passcode Setup Alert */}
+      {showPasscodeSetupAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+              </div>
+              <h3 className="text-xl font-bold">Passcode Required</h3>
+            </div>
+
+            <p className="mb-6 text-sm text-muted-foreground">
+              You need to set up a transaction passcode before you can add funds. This adds an extra layer of security to your transactions.
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowPasscodeSetupAlert(false)
+                  router.push("/?tab=profile")
+                }}
+                className="flex-1"
+              >
+                Set Up Passcode
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPasscodeSetupAlert(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}

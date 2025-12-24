@@ -85,6 +85,26 @@ const createUsersTable = () => {
       db.exec("ALTER TABLE users ADD COLUMN wallet_balance REAL DEFAULT 0.00");
       console.log('✅ Added wallet_balance column');
     }
+
+    if (!columnNames.includes('role')) {
+      db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'");
+      console.log('✅ Added role column');
+    }
+
+    if (!columnNames.includes('transaction_passcode')) {
+      db.exec("ALTER TABLE users ADD COLUMN transaction_passcode TEXT");
+      console.log('✅ Added transaction_passcode column');
+    }
+
+    if (!columnNames.includes('passcode_attempts')) {
+      db.exec("ALTER TABLE users ADD COLUMN passcode_attempts INTEGER DEFAULT 0");
+      console.log('✅ Added passcode_attempts column');
+    }
+
+    if (!columnNames.includes('passcode_locked_until')) {
+      db.exec("ALTER TABLE users ADD COLUMN passcode_locked_until DATETIME");
+      console.log('✅ Added passcode_locked_until column');
+    }
   } catch (error) {
     console.error('Error adding columns:', error.message);
   }
@@ -203,15 +223,60 @@ const createTransactionsTable = () => {
       description TEXT,
       stripe_payment_intent_id TEXT,
       recipient_id INTEGER,
+      money_status TEXT DEFAULT 'completed',
+      held_until DATETIME,
+      resolution_action TEXT,
+      resolved_at DATETIME,
+      resolved_by INTEGER,
+      fraud_log_id INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (recipient_id) REFERENCES users(id)
+      FOREIGN KEY (recipient_id) REFERENCES users(id),
+      FOREIGN KEY (resolved_by) REFERENCES users(id)
     )
   `;
 
   db.exec(sql);
   console.log('✅ Transactions table is ready');
+
+  // Add missing columns if they don't exist (for existing databases)
+  try {
+    const columns = db.prepare("PRAGMA table_info(transactions)").all();
+    const columnNames = columns.map(col => col.name);
+
+    if (!columnNames.includes('money_status')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN money_status TEXT DEFAULT 'completed'");
+      console.log('✅ Added money_status column to transactions');
+    }
+
+    if (!columnNames.includes('held_until')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN held_until DATETIME");
+      console.log('✅ Added held_until column to transactions');
+    }
+
+    if (!columnNames.includes('resolution_action')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN resolution_action TEXT");
+      console.log('✅ Added resolution_action column to transactions');
+    }
+
+    if (!columnNames.includes('resolved_at')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN resolved_at DATETIME");
+      console.log('✅ Added resolved_at column to transactions');
+    }
+
+    if (!columnNames.includes('resolved_by')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN resolved_by INTEGER");
+      console.log('✅ Added resolved_by column to transactions');
+    }
+
+    if (!columnNames.includes('fraud_log_id')) {
+      db.exec("ALTER TABLE transactions ADD COLUMN fraud_log_id INTEGER");
+      console.log('✅ Added fraud_log_id column to transactions');
+    }
+  } catch (error) {
+    console.error('Error adding columns to transactions:', error.message);
+  }
 };
 
 // Initialize database
