@@ -1,0 +1,95 @@
+version: '3.9'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: fraudwallet-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+      - fraud-service
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: fraudwallet-frontend
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://backend:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+  # Backend Monolith (Express.js)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: fraudwallet-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-key}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - FRAUD_SERVICE_URL=http://fraud-service:8085
+      - DB_PATH=/app/data/fraudwallet.db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - shared-data:/app/data
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+    depends_on:
+      - fraud-service
+
+  # Fraud Detection Microservice
+  fraud-service:
+    build:
+      context: ./fraud-service
+      dockerfile: Dockerfile
+    container_name: fraudwallet-fraud-service
+    ports:
+      - "8085:8085"
+    environment:
+      - NODE_ENV=production
+      - PORT=8085
+      - DB_PATH=/app/data/fraudwallet.db
+    volumes:
+      - shared-data:/app/data
+    networks:
+      - fraudwallet-network
+    restart: unless-stopped
+
+volumes:
+  shared-data:
+    driver: local
+
+networks:
+  fraudwallet-network:
+    driver: bridge
