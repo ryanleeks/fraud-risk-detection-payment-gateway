@@ -3,6 +3,7 @@ const db = require('./database');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // TEMPORARY: Using local fraud detection until service is ready
 const fraudDetection = require('./fraud-detection'); // Using local for now
+const { hasPasscode, verifyPasscode } = require('./passcode');
 
 // Amount validation constants
 const AMOUNT_LIMITS = {
