@@ -86,6 +86,7 @@ app.post('/api/wallet/send', verifyToken, wallet.sendMoney);
 // Fraud Detection routes (protected)
 // TEMPORARY: Using local fraud detection until fraud service is ready
 const fraudAPI = require('./fraudDetectionAPI'); // Using local for now
+app.get('/api/fraud/user-dashboard', verifyToken, fraudAPI.getUserDashboardMetrics);
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
 app.get('/api/fraud/system-health', verifyToken, fraudAPI.getSystemHealth);
