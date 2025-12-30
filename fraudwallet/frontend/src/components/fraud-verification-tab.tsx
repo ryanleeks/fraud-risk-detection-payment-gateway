@@ -56,14 +56,14 @@ export function FraudVerificationTab() {
       const headers = { "Authorization": `Bearer ${token}` }
 
       // Fetch unverified logs
-      const unverifiedResponse = await fetch("http://localhost:8080/api/fraud/unverified-logs?limit=50", { headers })
+      const unverifiedResponse = await fetch("/api/fraud/unverified-logs?limit=50", { headers })
       const unverifiedData = await unverifiedResponse.json()
       if (unverifiedData.success) {
         setUnverifiedLogs(unverifiedData.logs || [])
       }
 
       // Fetch verified logs
-      const verifiedResponse = await fetch("http://localhost:8080/api/fraud/verified-logs?limit=100", { headers })
+      const verifiedResponse = await fetch("/api/fraud/verified-logs?limit=100", { headers })
       const verifiedData = await verifiedResponse.json()
       if (verifiedData.success) {
         setVerifiedLogs(verifiedData.logs || [])
@@ -79,7 +79,7 @@ export function FraudVerificationTab() {
     setVerifying(logId)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8080/api/fraud/verify/${logId}`, {
+      const response = await fetch(`/api/fraud/verify/${logId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -112,7 +112,7 @@ export function FraudVerificationTab() {
     setRevoking(logId)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8080/api/fraud/revoke/${logId}`, {
+      const response = await fetch(`/api/fraud/revoke/${logId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -114,7 +114,7 @@ export const getRelativeTime = (date: Date): string => {
  */
 export const fetchUserTimezone = async (token: string): Promise<TimezoneInfo> => {
   try {
-    const response = await fetch('http://localhost:8080/api/user/timezone', {
+    const response = await fetch('/api/user/timezone', {
       headers: {
         'Authorization': `Bearer ${token}`
       }

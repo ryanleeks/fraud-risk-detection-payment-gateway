@@ -61,7 +61,7 @@ export function AcademicMetricsTab() {
       const token = localStorage.getItem("token")
       const headers = { "Authorization": `Bearer ${token}` }
 
-      const response = await fetch("http://localhost:8080/api/fraud/academic-metrics", { headers })
+      const response = await fetch("/api/fraud/academic-metrics", { headers })
       const data = await response.json()
 
       if (data.success) {
@@ -77,7 +77,7 @@ export function AcademicMetricsTab() {
   const exportDataset = async () => {
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/fraud/export-dataset", {
+      const response = await fetch("/api/fraud/export-dataset", {
         headers: { "Authorization": `Bearer ${token}` }
       })
 

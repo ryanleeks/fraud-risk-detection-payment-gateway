@@ -58,7 +58,7 @@ export function UserManagementTab() {
     setLoading(true)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/admin/users", {
+      const response = await fetch("/api/admin/users", {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await response.json()
@@ -79,7 +79,7 @@ export function UserManagementTab() {
     try {
       const token = localStorage.getItem("token")
       const response = await fetch(
-        `http://localhost:8080/api/admin/users/${userId}/status`,
+        `/api/admin/users/${userId}/status`,
         {
           method: "PATCH",
           headers: {
@@ -116,7 +116,7 @@ export function UserManagementTab() {
     try {
       const token = localStorage.getItem("token")
       const response = await fetch(
-        `http://localhost:8080/api/admin/users/${userId}/password`,
+        `/api/admin/users/${userId}/password`,
         {
           method: "PATCH",
           headers: {

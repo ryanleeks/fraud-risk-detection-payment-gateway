@@ -48,14 +48,14 @@ export function MyFraudAlertsTab() {
       const headers = { "Authorization": `Bearer ${token}` }
 
       // Fetch fraud flags
-      const flagsResponse = await fetch("http://localhost:8080/api/fraud/my-flags", { headers })
+      const flagsResponse = await fetch("/api/fraud/my-flags", { headers })
       const flagsData = await flagsResponse.json()
       if (flagsData.success) {
         setFraudFlags(flagsData.flags || [])
       }
 
       // Fetch my appeals
-      const appealsResponse = await fetch("http://localhost:8080/api/fraud/appeals/my-appeals", { headers })
+      const appealsResponse = await fetch("/api/fraud/appeals/my-appeals", { headers })
       const appealsData = await appealsResponse.json()
       if (appealsData.success) {
         setMyAppeals(appealsData.appeals || [])
@@ -77,7 +77,7 @@ export function MyFraudAlertsTab() {
     setAppealing(fraudLogId)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8080/api/fraud/appeal/${fraudLogId}`, {
+      const response = await fetch(`/api/fraud/appeal/${fraudLogId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

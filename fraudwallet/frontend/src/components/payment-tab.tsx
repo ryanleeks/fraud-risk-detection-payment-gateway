@@ -49,7 +49,7 @@ export function PaymentTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/payment/lookup-recipient", {
+      const response = await fetch("/api/payment/lookup-recipient", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -109,7 +109,7 @@ export function PaymentTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/wallet/send", {
+      const response = await fetch("/api/wallet/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

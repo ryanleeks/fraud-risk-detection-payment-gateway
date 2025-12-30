@@ -134,15 +134,15 @@ export function FraudEngineTab() {
       const headers = { "Authorization": `Bearer ${token}` }
 
       // Fetch system metrics
-      const systemResponse = await fetch("http://localhost:8080/api/fraud/system-metrics", { headers })
+      const systemResponse = await fetch("/api/fraud/system-metrics", { headers })
       const systemData = await systemResponse.json()
 
       // Fetch AI metrics
-      const aiResponse = await fetch("http://localhost:8080/api/fraud/ai-metrics", { headers })
+      const aiResponse = await fetch("/api/fraud/ai-metrics", { headers })
       const aiData = await aiResponse.json()
 
       // Fetch system health
-      const healthResponse = await fetch("http://localhost:8080/api/fraud/system-health", { headers })
+      const healthResponse = await fetch("/api/fraud/system-health", { headers })
       const healthData = await healthResponse.json()
 
       if (systemData.success) {
