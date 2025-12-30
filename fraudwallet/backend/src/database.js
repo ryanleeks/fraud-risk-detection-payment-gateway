@@ -279,6 +279,36 @@ const createTransactionsTable = () => {
   }
 };
 
+// Create system health logs table for performance monitoring
+const createSystemHealthLogsTable = () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS system_health_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      cpu_usage REAL,
+      cpu_cores INTEGER,
+      memory_usage_percent REAL,
+      memory_used_mb REAL,
+      memory_total_mb REAL,
+      db_latency_ms INTEGER,
+      ai_connection_status TEXT,
+      uptime_seconds INTEGER,
+      ai_avg_response_time REAL,
+      rule_avg_response_time REAL,
+      total_checks INTEGER,
+      peak_response_time INTEGER,
+      min_response_time INTEGER,
+      avg_response_time REAL,
+      checks_per_minute REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  db.exec(sql);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_health_timestamp ON system_health_logs(timestamp)');
+  console.log('✅ System health logs table is ready');
+};
+
 // Initialize database
 const initDatabase = () => {
   try {
@@ -288,6 +318,7 @@ const initDatabase = () => {
     createSplitParticipantsTable();
     migrateSplitParticipantsTable();
     createTransactionsTable();
+    createSystemHealthLogsTable();
     console.log('🎉 Database initialized successfully!');
   } catch (error) {
     console.error('❌ Error initializing database:', error.message);

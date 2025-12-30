@@ -133,7 +133,7 @@ export function FraudEngineTab() {
   const [timeRange, setTimeRange] = useState<string>('1d')
   const [autoRefresh, setAutoRefresh] = useState<string>('off')
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportType, setExportType] = useState<'snapshot' | 'detailed'>('detailed')
+  const [exportType, setExportType] = useState<'system-performance' | 'snapshot' | 'detailed'>('system-performance')
 
   const loadData = async () => {
     setLoading(true)
@@ -233,26 +233,32 @@ export function FraudEngineTab() {
   const handleExport = async () => {
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(
-        `/api/fraud/export-metrics?timeRange=${timeRange}&exportType=${exportType}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      )
+
+      // Determine endpoint based on export type
+      let url = ''
+      if (exportType === 'system-performance') {
+        url = `/api/fraud/export-system-performance?timeRange=${timeRange}`
+      } else {
+        url = `/api/fraud/export-metrics?timeRange=${timeRange}&exportType=${exportType}`
+      }
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
       if (!response.ok) {
         throw new Error('Export failed')
       }
 
       const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = downloadUrl
       a.download = `fraud_${exportType}_${timeRange}_${Date.now()}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(downloadUrl)
 
       setShowExportModal(false)
     } catch (error) {
@@ -801,15 +807,31 @@ export function FraudEngineTab() {
                   <label className="flex items-start cursor-pointer">
                     <input
                       type="radio"
-                      value="snapshot"
-                      checked={exportType === 'snapshot'}
-                      onChange={(e) => setExportType(e.target.value as 'snapshot' | 'detailed')}
+                      value="system-performance"
+                      checked={exportType === 'system-performance'}
+                      onChange={(e) => setExportType(e.target.value as 'system-performance' | 'snapshot' | 'detailed')}
                       className="mt-1 mr-2"
                     />
                     <div>
-                      <div className="font-medium">Snapshot (Aggregated)</div>
+                      <div className="font-medium">System Performance (Time-Series)</div>
                       <div className="text-xs text-gray-600">
-                        Single row with summary metrics for the time period
+                        CPU, memory, response times over time - for academic research
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="radio"
+                      value="snapshot"
+                      checked={exportType === 'snapshot'}
+                      onChange={(e) => setExportType(e.target.value as 'system-performance' | 'snapshot' | 'detailed')}
+                      className="mt-1 mr-2"
+                    />
+                    <div>
+                      <div className="font-medium">Fraud Snapshot (Aggregated)</div>
+                      <div className="text-xs text-gray-600">
+                        Single row with summary fraud metrics
                       </div>
                     </div>
                   </label>
@@ -819,11 +841,11 @@ export function FraudEngineTab() {
                       type="radio"
                       value="detailed"
                       checked={exportType === 'detailed'}
-                      onChange={(e) => setExportType(e.target.value as 'snapshot' | 'detailed')}
+                      onChange={(e) => setExportType(e.target.value as 'system-performance' | 'snapshot' | 'detailed')}
                       className="mt-1 mr-2"
                     />
                     <div>
-                      <div className="font-medium">Detailed (Individual Logs)</div>
+                      <div className="font-medium">Fraud Logs (Individual)</div>
                       <div className="text-xs text-gray-600">
                         All fraud detection logs within the time range
                       </div>
