@@ -129,7 +129,7 @@ export function DashboardTab() {
       const token = localStorage.getItem("token")
 
       // Fetch wallet balance
-      const balanceResponse = await fetch("http://localhost:8080/api/wallet/balance", {
+      const balanceResponse = await fetch("/api/wallet/balance", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -149,7 +149,7 @@ export function DashboardTab() {
       }
 
       // Fetch transaction history
-      const transactionsResponse = await fetch("http://localhost:8080/api/wallet/transactions?limit=10", {
+      const transactionsResponse = await fetch("/api/wallet/transactions?limit=10", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -160,7 +160,7 @@ export function DashboardTab() {
       }
 
       // Fetch held transactions
-      const heldResponse = await fetch("http://localhost:8080/api/wallet/held-transactions", {
+      const heldResponse = await fetch("/api/wallet/held-transactions", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -217,7 +217,7 @@ export function DashboardTab() {
       const token = localStorage.getItem("token")
 
       // Create payment intent with passcode
-      const response = await fetch("http://localhost:8080/api/wallet/add-funds", {
+      const response = await fetch("/api/wallet/add-funds", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

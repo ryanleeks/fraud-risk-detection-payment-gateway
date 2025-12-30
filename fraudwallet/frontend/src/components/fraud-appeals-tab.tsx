@@ -42,7 +42,7 @@ export function FraudAppealsTab() {
     setLoading(true)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/fraud/appeals/pending", {
+      const response = await fetch("/api/fraud/appeals/pending", {
         headers: { "Authorization": `Bearer ${token}` }
       })
       const data = await response.json()
@@ -60,7 +60,7 @@ export function FraudAppealsTab() {
     setResolving(appealId)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8080/api/fraud/appeals/${appealId}/resolve`, {
+      const response = await fetch(`/api/fraud/appeals/${appealId}/resolve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

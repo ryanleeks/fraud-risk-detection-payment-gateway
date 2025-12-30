@@ -140,7 +140,7 @@ export function FraudDashboardTab() {
     setAppealing(fraudLogId)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8080/api/fraud/appeal/${fraudLogId}`, {
+      const response = await fetch(`/api/fraud/appeal/${fraudLogId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -274,7 +274,7 @@ export function FraudDashboardTab() {
       const headers = { "Authorization": `Bearer ${token}` }
 
       // Fetch dashboard metrics
-      const dashboardResponse = await fetch("http://localhost:8080/api/fraud/user-dashboard", { headers })
+      const dashboardResponse = await fetch("/api/fraud/user-dashboard", { headers })
       const dashboardData = await dashboardResponse.json()
       if (dashboardData.success && dashboardData.metrics) {
         setDashboardMetrics(dashboardData.metrics)
@@ -288,7 +288,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch user's personal stats
-      const userStatsResponse = await fetch("http://localhost:8080/api/fraud/user-stats", { headers })
+      const userStatsResponse = await fetch("/api/fraud/user-stats", { headers })
       const userStatsData = await userStatsResponse.json()
       if (userStatsData.success && userStatsData.stats) {
         setUserStats(userStatsData.stats)
@@ -306,7 +306,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch system metrics
-      const metricsResponse = await fetch("http://localhost:8080/api/fraud/system-metrics", { headers })
+      const metricsResponse = await fetch("/api/fraud/system-metrics", { headers })
       const metricsData = await metricsResponse.json()
       if (metricsData.success && metricsData.metrics) {
         setSystemMetrics(metricsData.metrics)
@@ -322,7 +322,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch high-risk users
-      const highRiskResponse = await fetch("http://localhost:8080/api/fraud/high-risk-users?limit=10&minScore=60", { headers })
+      const highRiskResponse = await fetch("/api/fraud/high-risk-users?limit=10&minScore=60", { headers })
       const highRiskData = await highRiskResponse.json()
       if (highRiskData.success && highRiskData.users) {
         setHighRiskUsers(highRiskData.users)
@@ -331,7 +331,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch top flagged users
-      const flaggedResponse = await fetch("http://localhost:8080/api/fraud/top-flagged-users?limit=10&days=7", { headers })
+      const flaggedResponse = await fetch("/api/fraud/top-flagged-users?limit=10&days=7", { headers })
       const flaggedData = await flaggedResponse.json()
       if (flaggedData.success && flaggedData.users) {
         setTopFlaggedUsers(flaggedData.users)
@@ -340,7 +340,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch recent logs
-      const logsResponse = await fetch("http://localhost:8080/api/fraud/recent-logs?limit=20", { headers })
+      const logsResponse = await fetch("/api/fraud/recent-logs?limit=20", { headers })
       const logsData = await logsResponse.json()
       if (logsData.success && logsData.logs) {
         setRecentLogs(logsData.logs)
@@ -349,7 +349,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch fraud flags
-      const flagsResponse = await fetch("http://localhost:8080/api/fraud/my-flags", { headers })
+      const flagsResponse = await fetch("/api/fraud/my-flags", { headers })
       const flagsData = await flagsResponse.json()
       if (flagsData.success) {
         setFraudFlags(flagsData.flags || [])
@@ -358,7 +358,7 @@ export function FraudDashboardTab() {
       }
 
       // Fetch my appeals
-      const appealsResponse = await fetch("http://localhost:8080/api/fraud/appeals/my-appeals", { headers })
+      const appealsResponse = await fetch("/api/fraud/appeals/my-appeals", { headers })
       const appealsData = await appealsResponse.json()
       if (appealsData.success) {
         setMyAppeals(appealsData.appeals || [])

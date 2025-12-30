@@ -61,7 +61,7 @@ export function ProfileTab() {
     const fetchPasscodeStatus = async () => {
       try {
         const token = localStorage.getItem("token")
-        const response = await fetch("http://localhost:8080/api/user/passcode/status", {
+        const response = await fetch("/api/user/passcode/status", {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -110,7 +110,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/profile", {
+      const response = await fetch("/api/user/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -157,7 +157,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/profile", {
+      const response = await fetch("/api/user/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -209,7 +209,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/phone", {
+      const response = await fetch("/api/user/phone", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -259,7 +259,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/terminate", {
+      const response = await fetch("/api/user/terminate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -295,7 +295,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/toggle", {
+      const response = await fetch("/api/user/2fa/toggle", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -338,7 +338,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/send-disable-code", {
+      const response = await fetch("/api/user/2fa/send-disable-code", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -382,7 +382,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/toggle", {
+      const response = await fetch("/api/user/2fa/toggle", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -431,7 +431,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/method", {
+      const response = await fetch("/api/user/2fa/method", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -469,7 +469,7 @@ export function ProfileTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/user/2fa/test", {
+      const response = await fetch("/api/user/2fa/test", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -510,7 +510,7 @@ export function ProfileTab() {
 
       if (passcodeMode === "setup") {
         // Setup requires password verification
-        const response = await fetch("http://localhost:8080/api/user/passcode/set", {
+        const response = await fetch("/api/user/passcode/set", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -533,7 +533,7 @@ export function ProfileTab() {
         }
       } else if (passcodeMode === "change") {
         // Change requires old and new passcode
-        const response = await fetch("http://localhost:8080/api/user/passcode/change", {
+        const response = await fetch("/api/user/passcode/change", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

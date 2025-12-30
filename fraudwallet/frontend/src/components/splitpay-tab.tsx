@@ -36,7 +36,7 @@ export function SplitPayTab() {
   const loadMySplits = async () => {
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/splitpay/my-splits", {
+      const response = await fetch("/api/splitpay/my-splits", {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -78,7 +78,7 @@ export function SplitPayTab() {
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:8080/api/payment/lookup-recipient", {
+      const response = await fetch("/api/payment/lookup-recipient", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -135,7 +135,7 @@ export function SplitPayTab() {
 
       // We need to find user IDs from the backend first
       // For now, let's assume we store the full user data in participants
-      const response = await fetch("http://localhost:8080/api/splitpay/create", {
+      const response = await fetch("/api/splitpay/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,7 +176,7 @@ export function SplitPayTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/splitpay/respond", {
+      const response = await fetch("/api/splitpay/respond", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -214,7 +214,7 @@ export function SplitPayTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/splitpay/pay", {
+      const response = await fetch("/api/splitpay/pay", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -257,7 +257,7 @@ export function SplitPayTab() {
     try {
       const token = localStorage.getItem("token")
 
-      const response = await fetch("http://localhost:8080/api/splitpay/cancel", {
+      const response = await fetch("/api/splitpay/cancel", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
