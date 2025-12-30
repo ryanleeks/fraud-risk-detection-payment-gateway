@@ -1628,6 +1628,96 @@ const exportMetrics = async (req, res) => {
   }
 };
 
+/**
+ * Export system performance metrics as CSV
+ * Time-series data of CPU, memory, response times for academic research
+ * ?timeRange=1h|3h|12h|1d|3d|7d
+ */
+const exportSystemPerformance = async (req, res) => {
+  try {
+    const { timeRange = '1d' } = req.query;
+
+    const timeFilter = getTimeFilterSQL(timeRange, 'timestamp');
+    const whereClause = timeFilter ? `WHERE ${timeFilter}` : '';
+
+    const metrics = db.prepare(`
+      SELECT
+        timestamp,
+        cpu_usage,
+        memory_usage_percent,
+        memory_used_mb,
+        memory_total_mb,
+        db_latency_ms,
+        ai_connection_status,
+        uptime_seconds,
+        ai_avg_response_time,
+        rule_avg_response_time,
+        total_checks,
+        peak_response_time,
+        min_response_time,
+        avg_response_time,
+        checks_per_minute
+      FROM system_health_logs
+      ${whereClause}
+      ORDER BY timestamp DESC
+    `).all();
+
+    // Build CSV
+    const csvRows = [];
+    csvRows.push([
+      'Timestamp',
+      'CPU Usage (%)',
+      'Memory Usage (%)',
+      'Memory Used (MB)',
+      'Memory Total (MB)',
+      'DB Latency (ms)',
+      'AI Connection Status',
+      'Uptime (hours)',
+      'AI Avg Response Time (ms)',
+      'Rule Avg Response Time (ms)',
+      'Total Checks (period)',
+      'Peak Response Time (ms)',
+      'Min Response Time (ms)',
+      'Avg Response Time (ms)',
+      'Checks Per Minute'
+    ].join(','));
+
+    metrics.forEach(m => {
+      csvRows.push([
+        m.timestamp,
+        m.cpu_usage?.toFixed(1) || 0,
+        m.memory_usage_percent?.toFixed(1) || 0,
+        m.memory_used_mb?.toFixed(0) || 0,
+        m.memory_total_mb?.toFixed(0) || 0,
+        m.db_latency_ms || 0,
+        m.ai_connection_status || 'unknown',
+        (m.uptime_seconds / 3600).toFixed(1),
+        m.ai_avg_response_time?.toFixed(0) || 0,
+        m.rule_avg_response_time?.toFixed(0) || 0,
+        m.total_checks || 0,
+        m.peak_response_time || 0,
+        m.min_response_time || 0,
+        m.avg_response_time?.toFixed(0) || 0,
+        m.checks_per_minute?.toFixed(2) || 0
+      ].join(','));
+    });
+
+    const csv = csvRows.join('\n');
+    const filename = `system_performance_${timeRange}_${Date.now()}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+
+  } catch (error) {
+    console.error('Export system performance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting system performance'
+    });
+  }
+};
+
 module.exports = {
   getUserDashboardMetrics,
   getUserFraudStats,
@@ -1651,6 +1741,7 @@ module.exports = {
   getThresholdAnalysis,
   exportDataset,
   exportMetrics,
+  exportSystemPerformance,
   // System health
   getSystemHealth,
   // Auto-approval endpoints

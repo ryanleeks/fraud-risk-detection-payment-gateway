@@ -90,6 +90,7 @@ app.get('/api/fraud/user-dashboard', verifyToken, fraudAPI.getUserDashboardMetri
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
 app.get('/api/fraud/export-metrics', verifyToken, fraudAPI.exportMetrics);
+app.get('/api/fraud/export-system-performance', verifyToken, fraudAPI.exportSystemPerformance);
 app.get('/api/fraud/system-health', verifyToken, fraudAPI.getSystemHealth);
 app.get('/api/fraud/recent-logs', verifyToken, fraudAPI.getRecentFraudLogs);
 app.get('/api/fraud/high-risk-users', verifyToken, fraudAPI.getHighRiskUsers);
@@ -140,6 +141,10 @@ app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);
 app.get('/api/admin/users/:userId', verifyAdminToken, adminAPI.getUserById);
 app.patch('/api/admin/users/:userId/status', verifyAdminToken, adminAPI.updateUserStatus);
 app.patch('/api/admin/users/:userId/password', verifyAdminToken, adminAPI.resetUserPassword);
+
+// Initialize system health monitoring
+const systemHealthMonitor = require('./monitoring/systemHealthMonitor');
+systemHealthMonitor.start();
 
 // Start the server
 const PORT = process.env.PORT || 8080;
