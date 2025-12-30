@@ -58,6 +58,8 @@ const RULE_CATALOG = {
 }
 
 interface SystemMetrics {
+  timeRange?: string
+  timeRangeLabel?: string
   totalChecks: number
   avgResponseTime: number
   riskDistribution: {
@@ -77,6 +79,8 @@ interface SystemMetrics {
 }
 
 interface AIMetrics {
+  timeRange?: string
+  timeRangeLabel?: string
   totalAnalyses: number
   avgConfidence: number
   avgRiskScore: number
@@ -126,6 +130,10 @@ export function FraudEngineTab() {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedCategory, setExpandedCategory] = useState<string | null>("velocity")
+  const [timeRange, setTimeRange] = useState<string>('1d')
+  const [autoRefresh, setAutoRefresh] = useState<string>('off')
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportType, setExportType] = useState<'snapshot' | 'detailed'>('detailed')
 
   const loadData = async () => {
     setLoading(true)
@@ -133,12 +141,12 @@ export function FraudEngineTab() {
       const token = localStorage.getItem("token")
       const headers = { "Authorization": `Bearer ${token}` }
 
-      // Fetch system metrics
-      const systemResponse = await fetch("/api/fraud/system-metrics", { headers })
+      // Fetch system metrics with time range
+      const systemResponse = await fetch(`/api/fraud/system-metrics?timeRange=${timeRange}`, { headers })
       const systemData = await systemResponse.json()
 
-      // Fetch AI metrics
-      const aiResponse = await fetch("/api/fraud/ai-metrics", { headers })
+      // Fetch AI metrics with time range
+      const aiResponse = await fetch(`/api/fraud/ai-metrics?timeRange=${timeRange}`, { headers })
       const aiData = await aiResponse.json()
 
       // Fetch system health
@@ -170,7 +178,27 @@ export function FraudEngineTab() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [timeRange])
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (autoRefresh === 'off') return
+
+    const intervals = {
+      '30s': 30000,
+      '1m': 60000,
+      '5m': 300000
+    }
+
+    const intervalTime = intervals[autoRefresh as keyof typeof intervals]
+    if (!intervalTime) return
+
+    const interval = setInterval(() => {
+      loadData()
+    }, intervalTime)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, timeRange])
 
   if (loading || !systemMetrics || !aiMetrics) {
     return (
@@ -202,6 +230,37 @@ export function FraudEngineTab() {
     return ((num / denom) * 100).toFixed(1)
   }
 
+  const handleExport = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(
+        `/api/fraud/export-metrics?timeRange=${timeRange}&exportType=${exportType}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Export failed')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fraud_${exportType}_${timeRange}_${Date.now()}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setShowExportModal(false)
+    } catch (error) {
+      console.error('Export error:', error)
+      alert('Failed to export data')
+    }
+  }
+
   return (
     <div ref={containerRef} className="space-y-6 pb-20 overflow-y-auto h-full">
       <PullToRefreshIndicator
@@ -218,6 +277,59 @@ export function FraudEngineTab() {
           How our fraud detection system works - rules, scoring, and AI analysis
         </p>
       </div>
+
+      {/* Time Range Filter & Controls */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Time Range:</span>
+            <div className="flex gap-1">
+              {['1m', '1h', '3h', '12h', '1d', '3d', '7d'].map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                    timeRange === range
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {range}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Auto-Refresh Selector */}
+          <div className="flex items-center gap-2 border-l pl-4">
+            <span className="text-sm font-medium">Auto-refresh:</span>
+            <select
+              value={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="off">Off</option>
+              <option value="30s">30 seconds</option>
+              <option value="1m">1 minute</option>
+              <option value="5m">5 minutes</option>
+            </select>
+          </div>
+
+          {/* Export Button */}
+          <div className="ml-auto">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </Card>
 
       {/* Section 1: System Status */}
       <Card className="p-6">
@@ -662,6 +774,90 @@ export function FraudEngineTab() {
           </div>
         </Card>
       </Card>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Export Fraud Engine Data</h3>
+
+            <div className="space-y-4">
+              {/* Time Range Display */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Time Range
+                </label>
+                <div className="px-3 py-2 bg-gray-100 rounded text-sm">
+                  {systemMetrics?.timeRangeLabel || timeRange}
+                </div>
+              </div>
+
+              {/* Export Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Export Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="radio"
+                      value="snapshot"
+                      checked={exportType === 'snapshot'}
+                      onChange={(e) => setExportType(e.target.value as 'snapshot' | 'detailed')}
+                      className="mt-1 mr-2"
+                    />
+                    <div>
+                      <div className="font-medium">Snapshot (Aggregated)</div>
+                      <div className="text-xs text-gray-600">
+                        Single row with summary metrics for the time period
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start cursor-pointer">
+                    <input
+                      type="radio"
+                      value="detailed"
+                      checked={exportType === 'detailed'}
+                      onChange={(e) => setExportType(e.target.value as 'snapshot' | 'detailed')}
+                      className="mt-1 mr-2"
+                    />
+                    <div>
+                      <div className="font-medium">Detailed (Individual Logs)</div>
+                      <div className="text-xs text-gray-600">
+                        All fraud detection logs within the time range
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Estimated Rows */}
+              {exportType === 'detailed' && (
+                <div className="text-sm text-gray-600">
+                  Estimated rows: {systemMetrics?.totalChecks?.toLocaleString() || 'N/A'}
+                </div>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

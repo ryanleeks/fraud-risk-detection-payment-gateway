@@ -89,6 +89,7 @@ const fraudAPI = require('./fraudDetectionAPI'); // Using local for now
 app.get('/api/fraud/user-dashboard', verifyToken, fraudAPI.getUserDashboardMetrics);
 app.get('/api/fraud/user-stats', verifyToken, fraudAPI.getUserFraudStats);
 app.get('/api/fraud/system-metrics', verifyToken, fraudAPI.getSystemMetrics);
+app.get('/api/fraud/export-metrics', verifyToken, fraudAPI.exportMetrics);
 app.get('/api/fraud/system-health', verifyToken, fraudAPI.getSystemHealth);
 app.get('/api/fraud/recent-logs', verifyToken, fraudAPI.getRecentFraudLogs);
 app.get('/api/fraud/high-risk-users', verifyToken, fraudAPI.getHighRiskUsers);

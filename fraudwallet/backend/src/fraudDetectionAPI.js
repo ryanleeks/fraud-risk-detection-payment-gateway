@@ -7,6 +7,7 @@ const academicMetrics = require('./fraud-detection/monitoring/academicMetrics');
 const healthRegeneration = require('./fraud-detection/utils/healthRegeneration');
 const db = require('./database');
 const wallet = require('./wallet');
+const { getTimeFilterSQL, getTimeRangeLabel } = require('./utils/timeRangeHelper');
 
 /**
  * Get dashboard metrics for current user
@@ -94,10 +95,29 @@ const getUserFraudStats = async (req, res) => {
 
 /**
  * Get system-wide fraud detection metrics (admin only)
+ * Supports time range filtering: ?timeRange=1m|1h|3h|12h|1d|3d|7d
  */
 const getSystemMetrics = async (req, res) => {
   try {
-    const rawMetrics = await fraudDetection.getSystemMetrics();
+    const { timeRange = '1d' } = req.query;
+
+    // Build time filter
+    const timeFilter = getTimeFilterSQL(timeRange);
+    const whereClause = timeFilter ? `WHERE ${timeFilter}` : '';
+
+    // Get total checks in time range
+    const totalChecks = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM fraud_logs
+      ${whereClause}
+    `).get();
+
+    // Get average response time
+    const avgResponseTime = db.prepare(`
+      SELECT AVG(execution_time_ms) as avg_time
+      FROM fraud_logs
+      ${whereClause}
+    `).get();
 
     // Get action distribution
     const actionDist = db.prepare(`
@@ -105,7 +125,7 @@ const getSystemMetrics = async (req, res) => {
         action_taken,
         COUNT(*) as count
       FROM fraud_logs
-      WHERE created_at > datetime('now', '-24 hours')
+      ${whereClause}
       GROUP BY action_taken
     `).all();
 
@@ -123,11 +143,36 @@ const getSystemMetrics = async (req, res) => {
       }
     });
 
+    // Get risk distribution
+    const riskDist = db.prepare(`
+      SELECT
+        risk_level,
+        COUNT(*) as count
+      FROM fraud_logs
+      ${whereClause}
+      GROUP BY risk_level
+    `).all();
+
+    const riskDistribution = {
+      minimal: 0,
+      low: 0,
+      medium: 0,
+      high: 0,
+      critical: 0
+    };
+
+    riskDist.forEach(item => {
+      const level = item.risk_level.toLowerCase();
+      if (level in riskDistribution) {
+        riskDistribution[level] = item.count;
+      }
+    });
+
     // Extract and count individual rules from triggered rules
     const ruleStats = db.prepare(`
       SELECT rules_triggered
       FROM fraud_logs
-      WHERE created_at > datetime('now', '-7 days')
+      ${whereClause}
       AND rules_triggered != '[]'
     `).all();
 
@@ -147,30 +192,16 @@ const getSystemMetrics = async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Transform to frontend-expected format
+    // Build response
     const metrics = {
-      totalChecks: rawMetrics.last24Hours?.total_checks || 0,
-      avgResponseTime: rawMetrics.last24Hours?.avg_execution_time || 0,
+      timeRange,
+      timeRangeLabel: getTimeRangeLabel(timeRange),
+      totalChecks: totalChecks.count || 0,
+      avgResponseTime: avgResponseTime.avg_time ? Math.round(avgResponseTime.avg_time) : 0,
       actionDistribution,
-      topRules,
-      riskDistribution: {
-        minimal: 0,
-        low: 0,
-        medium: 0,
-        high: 0,
-        critical: 0
-      }
+      riskDistribution,
+      topRules
     };
-
-    // Map risk levels
-    if (rawMetrics.riskLevelDistribution) {
-      rawMetrics.riskLevelDistribution.forEach(item => {
-        const level = item.risk_level.toLowerCase();
-        if (level in metrics.riskDistribution) {
-          metrics.riskDistribution[level] = item.count;
-        }
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -418,9 +449,15 @@ const getAIFraudLogs = async (req, res) => {
  */
 const getAIMetrics = async (req, res) => {
   try {
+    const { timeRange = '1d' } = req.query;
+
     // Check if AI is enabled
     const geminiAI = require('./fraud-detection/geminiAI');
     const aiEnabled = geminiAI.enabled || false;
+
+    // Build time filter
+    const timeFilter = getTimeFilterSQL(timeRange);
+    const whereClause = timeFilter ? `WHERE ${timeFilter}` : 'WHERE 1=1';
 
     // Overall AI usage
     const aiUsage = db.prepare(`
@@ -432,7 +469,7 @@ const getAIMetrics = async (req, res) => {
         COUNT(CASE WHEN detection_method = 'hybrid' THEN 1 END) as hybrid_count,
         COUNT(CASE WHEN detection_method = 'rules' THEN 1 END) as rules_only_count
       FROM fraud_logs
-      WHERE created_at > datetime('now', '-24 hours')
+      ${whereClause}
       AND ai_risk_score IS NOT NULL
     `).get();
 
@@ -440,7 +477,7 @@ const getAIMetrics = async (req, res) => {
     const redFlagsData = db.prepare(`
       SELECT ai_red_flags
       FROM fraud_logs
-      WHERE created_at > datetime('now', '-7 days')
+      ${whereClause}
       AND ai_red_flags IS NOT NULL
       AND ai_red_flags != '[]'
     `).all();
@@ -466,7 +503,7 @@ const getAIMetrics = async (req, res) => {
         COUNT(*) as total_hybrid,
         COUNT(CASE WHEN ABS(rule_based_score - ai_risk_score) >= 20 THEN 1 END) as significant_disagreements
       FROM fraud_logs
-      WHERE created_at > datetime('now', '-7 days')
+      ${whereClause}
       AND detection_method = 'hybrid'
       AND ai_risk_score IS NOT NULL
       AND rule_based_score IS NOT NULL
@@ -478,6 +515,8 @@ const getAIMetrics = async (req, res) => {
 
     // Transform to frontend-expected format
     const metrics = {
+      timeRange,
+      timeRangeLabel: getTimeRangeLabel(timeRange),
       aiEnabled,
       totalAnalyses: aiUsage.total_ai_checks || 0,
       avgConfidence: aiUsage.avg_confidence || 0,
@@ -1383,6 +1422,212 @@ const getHealthTrend = async (req, res) => {
   }
 };
 
+/**
+ * Export fraud engine metrics as CSV
+ * Supports two modes: snapshot (aggregated) and detailed (individual logs)
+ * ?timeRange=1h&exportType=snapshot|detailed
+ */
+const exportMetrics = async (req, res) => {
+  try {
+    const { timeRange = '1d', exportType = 'detailed' } = req.query;
+
+    const timeFilter = getTimeFilterSQL(timeRange);
+    const whereClause = timeFilter ? `WHERE ${timeFilter}` : '';
+
+    if (exportType === 'snapshot') {
+      // SNAPSHOT MODE: Single row with aggregated metrics
+
+      const metrics = db.prepare(`
+        SELECT
+          COUNT(*) as total_checks,
+          AVG(execution_time_ms) as avg_response_time,
+          AVG(risk_score) as avg_risk_score,
+          MIN(created_at) as period_start,
+          MAX(created_at) as period_end
+        FROM fraud_logs
+        ${whereClause}
+      `).get();
+
+      const actions = db.prepare(`
+        SELECT action_taken, COUNT(*) as count
+        FROM fraud_logs
+        ${whereClause}
+        GROUP BY action_taken
+      `).all();
+
+      const actionMap = {};
+      actions.forEach(a => {
+        actionMap[a.action_taken.toLowerCase()] = a.count;
+      });
+
+      const risks = db.prepare(`
+        SELECT risk_level, COUNT(*) as count
+        FROM fraud_logs
+        ${whereClause}
+        GROUP BY risk_level
+      `).all();
+
+      const riskMap = {};
+      risks.forEach(r => {
+        riskMap[r.risk_level.toLowerCase()] = r.count;
+      });
+
+      const aiMetrics = db.prepare(`
+        SELECT
+          AVG(ai_risk_score) as avg_ai_score,
+          AVG(ai_confidence) as avg_ai_confidence
+        FROM fraud_logs
+        ${whereClause}
+        AND ai_risk_score IS NOT NULL
+      `).get();
+
+      const csvRows = [];
+      csvRows.push([
+        'Time Range',
+        'Period Start',
+        'Period End',
+        'Total Checks',
+        'Avg Response Time (ms)',
+        'Avg Risk Score',
+        'Actions: Allow',
+        'Actions: Challenge',
+        'Actions: Review',
+        'Actions: Block',
+        'Risk: Minimal',
+        'Risk: Low',
+        'Risk: Medium',
+        'Risk: High',
+        'Risk: Critical',
+        'AI Avg Risk Score',
+        'AI Avg Confidence'
+      ].join(','));
+
+      csvRows.push([
+        getTimeRangeLabel(timeRange),
+        metrics.period_start || 'N/A',
+        metrics.period_end || 'N/A',
+        metrics.total_checks || 0,
+        metrics.avg_response_time ? Math.round(metrics.avg_response_time) : 0,
+        metrics.avg_risk_score ? metrics.avg_risk_score.toFixed(2) : 0,
+        actionMap.allow || 0,
+        actionMap.challenge || 0,
+        actionMap.review || 0,
+        actionMap.block || 0,
+        riskMap.minimal || 0,
+        riskMap.low || 0,
+        riskMap.medium || 0,
+        riskMap.high || 0,
+        riskMap.critical || 0,
+        aiMetrics.avg_ai_score ? aiMetrics.avg_ai_score.toFixed(2) : 'N/A',
+        aiMetrics.avg_ai_confidence ? aiMetrics.avg_ai_confidence.toFixed(2) : 'N/A'
+      ].join(','));
+
+      const csv = csvRows.join('\n');
+      const filename = `fraud_metrics_snapshot_${timeRange}_${Date.now()}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+
+    } else {
+      // DETAILED MODE: Individual fraud logs
+
+      const logs = db.prepare(`
+        SELECT
+          id,
+          created_at,
+          user_id,
+          transaction_type,
+          amount,
+          risk_score,
+          risk_level,
+          action_taken,
+          rules_triggered,
+          execution_time_ms,
+          rule_based_score,
+          ai_risk_score,
+          ai_confidence,
+          ai_red_flags,
+          detection_method,
+          ip_address,
+          country,
+          city,
+          location_changed,
+          recipient_id,
+          recipient_name
+        FROM fraud_logs
+        ${whereClause}
+        ORDER BY created_at DESC
+      `).all();
+
+      const csvRows = [];
+      csvRows.push([
+        'ID',
+        'Timestamp',
+        'User ID',
+        'Transaction Type',
+        'Amount',
+        'Risk Score',
+        'Risk Level',
+        'Action Taken',
+        'Rules Triggered',
+        'Execution Time (ms)',
+        'Rule-Based Score',
+        'AI Risk Score',
+        'AI Confidence',
+        'AI Red Flags',
+        'Detection Method',
+        'IP Address',
+        'Country',
+        'City',
+        'Location Changed',
+        'Recipient ID',
+        'Recipient Name'
+      ].join(','));
+
+      logs.forEach(log => {
+        csvRows.push([
+          log.id,
+          log.created_at,
+          log.user_id,
+          log.transaction_type,
+          log.amount,
+          log.risk_score,
+          log.risk_level,
+          log.action_taken,
+          `"${log.rules_triggered || '[]'}"`,
+          log.execution_time_ms,
+          log.rule_based_score || 'N/A',
+          log.ai_risk_score || 'N/A',
+          log.ai_confidence || 'N/A',
+          `"${log.ai_red_flags || '[]'}"`,
+          log.detection_method,
+          log.ip_address,
+          log.country,
+          log.city,
+          log.location_changed,
+          log.recipient_id || 'N/A',
+          log.recipient_name || 'N/A'
+        ].join(','));
+      });
+
+      const csv = csvRows.join('\n');
+      const filename = `fraud_logs_detailed_${timeRange}_${Date.now()}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+    }
+
+  } catch (error) {
+    console.error('Export metrics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting metrics'
+    });
+  }
+};
+
 module.exports = {
   getUserDashboardMetrics,
   getUserFraudStats,
@@ -1405,6 +1650,7 @@ module.exports = {
   getErrorAnalysis,
   getThresholdAnalysis,
   exportDataset,
+  exportMetrics,
   // System health
   getSystemHealth,
   // Auto-approval endpoints
