@@ -1,0 +1,226 @@
+@startuml FraudWallet Use Case Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+
+left to right direction
+
+' Actors
+actor "User" as User #lightblue
+actor "Administrator" as Admin #orange
+actor "Fraud Detection AI" as FraudAI #red
+actor "Stripe Payment\nGateway" as Stripe #green
+actor "Email/SMS\nSystem" as EmailSys #purple
+
+rectangle "FraudWallet Payment System" {
+
+    ' ========== Authentication & Account Management ==========
+    package "Authentication & Account" #TECHNOLOGY {
+        usecase "Sign Up" as UC1
+        usecase "Login" as UC2
+        usecase "Verify 2FA Code" as UC3
+        usecase "Toggle 2FA" as UC4
+        usecase "Update 2FA Method" as UC5
+        usecase "Manage Profile" as UC6
+        usecase "Change Phone Number" as UC7
+        usecase "Terminate Account" as UC8
+        usecase "Set Passcode" as UC9
+        usecase "Verify Passcode" as UC10
+        usecase "Change Passcode" as UC11
+    }
+
+    ' ========== Wallet & Payments ==========
+    package "Wallet & Payments" #APPLICATION {
+        usecase "View Wallet Balance" as UC12
+        usecase "Add Funds to Wallet" as UC13
+        usecase "Send Money" as UC14
+        usecase "View Transaction History" as UC15
+        usecase "Lookup Recipient" as UC16
+        usecase "View Held Transactions" as UC17
+    }
+
+    ' ========== SplitPay ==========
+    package "SplitPay Features" #MOTIVATION {
+        usecase "Create Split Payment" as UC18
+        usecase "View My Split Payments" as UC19
+        usecase "Respond to Split Request" as UC20
+        usecase "Pay Split Share" as UC21
+        usecase "Cancel Split Payment" as UC22
+    }
+
+    ' ========== Fraud Detection (User) ==========
+    package "Fraud Monitoring (User)" #STRATEGY {
+        usecase "View Fraud Dashboard" as UC23
+        usecase "View My Fraud Alerts" as UC24
+        usecase "View Fraud Statistics" as UC25
+        usecase "Submit Fraud Appeal" as UC26
+        usecase "View My Appeals" as UC27
+        usecase "View System Health" as UC28
+    }
+
+    ' ========== Fraud Detection (AI/System) ==========
+    package "Fraud Detection Engine" #IMPLEMENTATION {
+        usecase "Analyze Transaction\nfor Fraud" as UC29
+        usecase "Calculate Risk Score" as UC30
+        usecase "Flag Suspicious\nTransaction" as UC31
+        usecase "Hold Transaction" as UC32
+        usecase "Auto-Approve\nTransaction" as UC33
+        usecase "Log Fraud Data" as UC34
+    }
+
+    ' ========== Admin - Fraud Verification ==========
+    package "Admin - Fraud Management" #PHYSICAL {
+        usecase "Verify Fraud\nTransactions" as UC35
+        usecase "Review Pending\nAppeals" as UC36
+        usecase "Resolve Appeal" as UC37
+        usecase "Release Held Money" as UC38
+        usecase "Return Held Money" as UC39
+        usecase "Confiscate Money" as UC40
+        usecase "Revoke Auto-Approval" as UC41
+        usecase "Trigger Auto-Approval" as UC42
+        usecase "View Unverified Logs" as UC43
+    }
+
+    ' ========== Admin - Analytics & Metrics ==========
+    package "Admin - Analytics & Research" #PROCESS {
+        usecase "View Academic Metrics" as UC44
+        usecase "View Confusion Matrix" as UC45
+        usecase "Export Dataset (CSV)" as UC46
+        usecase "View Metrics History" as UC47
+        usecase "View Error Analysis" as UC48
+        usecase "View Threshold Analysis" as UC49
+        usecase "View AI Metrics" as UC50
+        usecase "View Disagreement Cases" as UC51
+        usecase "Export System\nPerformance" as UC52
+    }
+
+    ' ========== Admin - User Management ==========
+    package "Admin - User Management" #TECHNOLOGY {
+        usecase "View All Users" as UC53
+        usecase "View User Details" as UC54
+        usecase "View High Risk Users" as UC55
+        usecase "View Top Flagged Users" as UC56
+        usecase "View User Fraud\nDetails" as UC57
+    }
+
+    ' ========== External System Integration ==========
+    package "External Integrations" #lightgray {
+        usecase "Process Stripe\nPayment" as UC58
+        usecase "Handle Stripe\nWebhook" as UC59
+        usecase "Send 2FA Code" as UC60
+        usecase "Send Email\nNotifications" as UC61
+    }
+}
+
+' ========== User Relationships ==========
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC9
+User --> UC10
+User --> UC11
+
+User --> UC12
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+
+User --> UC18
+User --> UC19
+User --> UC20
+User --> UC21
+User --> UC22
+
+User --> UC23
+User --> UC24
+User --> UC25
+User --> UC26
+User --> UC27
+User --> UC28
+
+' ========== Admin Relationships ==========
+Admin --> UC35
+Admin --> UC36
+Admin --> UC37
+Admin --> UC38
+Admin --> UC39
+Admin --> UC40
+Admin --> UC41
+Admin --> UC42
+Admin --> UC43
+
+Admin --> UC44
+Admin --> UC45
+Admin --> UC46
+Admin --> UC47
+Admin --> UC48
+Admin --> UC49
+Admin --> UC50
+Admin --> UC51
+Admin --> UC52
+
+Admin --> UC53
+Admin --> UC54
+Admin --> UC55
+Admin --> UC56
+Admin --> UC57
+
+' Admin can also perform user actions
+Admin --> UC12
+Admin --> UC23
+
+' ========== Fraud AI Relationships ==========
+FraudAI --> UC29
+FraudAI --> UC30
+FraudAI --> UC31
+FraudAI --> UC32
+FraudAI --> UC33
+FraudAI --> UC34
+
+' ========== Stripe Relationships ==========
+Stripe --> UC58
+Stripe --> UC59
+
+' ========== Email System Relationships ==========
+EmailSys --> UC60
+EmailSys --> UC61
+
+' ========== Use Case Dependencies (includes/extends) ==========
+UC2 ..> UC3 : <<extends>>
+UC13 ..> UC58 : <<include>>
+UC14 ..> UC29 : <<include>>
+UC29 ..> UC30 : <<include>>
+UC30 ..> UC31 : <<include>>
+UC31 ..> UC32 : <<include>>
+UC4 ..> UC60 : <<include>>
+UC26 ..> UC61 : <<include>>
+UC35 ..> UC34 : <<include>>
+
+note right of FraudAI
+  AI system automatically analyzes
+  all transactions in real-time
+  and calculates risk scores
+end note
+
+note right of Admin
+  Super User with full
+  system access including
+  fraud verification and
+  academic research tools
+end note
+
+note right of User
+  Regular customers who
+  use the payment gateway
+  for transactions and
+  split payments
+end note
+
+@enduml
