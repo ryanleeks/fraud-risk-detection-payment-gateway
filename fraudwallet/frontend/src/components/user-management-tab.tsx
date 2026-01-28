@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { User, Search, Shield, Ban, KeyRound, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { User, Search, Shield, Ban, KeyRound, CheckCircle, XCircle, Loader2, Lock } from "lucide-react"
 import { TimeDisplay } from "@/components/TimeDisplay"
 
 interface UserData {
@@ -31,6 +31,7 @@ export function UserManagementTab() {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [newPassword, setNewPassword] = useState("")
+  const [newPasscode, setNewPasscode] = useState("")
 
   useEffect(() => {
     loadUsers()
@@ -138,6 +139,43 @@ export function UserManagementTab() {
     } catch (err) {
       console.error("Reset password error:", err)
       alert("Failed to reset password")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const resetPasscode = async (userId: number) => {
+    if (!newPasscode || !/^\d{6}$/.test(newPasscode)) {
+      alert("Passcode must be exactly 6 digits")
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(
+        `/api/admin/users/${userId}/passcode`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ newPasscode }),
+        }
+      )
+      const data = await response.json()
+
+      if (data.success) {
+        alert("Transaction passcode reset successfully")
+        setNewPasscode("")
+        setSelectedUser(null)
+      } else {
+        alert(data.message || "Failed to reset passcode")
+      }
+    } catch (err) {
+      console.error("Reset passcode error:", err)
+      alert("Failed to reset passcode")
     } finally {
       setActionLoading(false)
     }
@@ -288,6 +326,36 @@ export function UserManagementTab() {
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                           ) : (
                             <KeyRound className="h-4 w-4 mr-2" />
+                          )}
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Reset Transaction Passcode */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reset Transaction Passcode</label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          placeholder="New passcode (6 digits)"
+                          value={newPasscode}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, "").slice(0, 6)
+                            setNewPasscode(value)
+                          }}
+                          maxLength={6}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => resetPasscode(user.id)}
+                          disabled={actionLoading || newPasscode.length !== 6}
+                        >
+                          {actionLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Lock className="h-4 w-4 mr-2" />
                           )}
                           Reset
                         </Button>

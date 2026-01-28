@@ -147,6 +147,7 @@ app.get('/api/admin/users', verifyAdminToken, adminAPI.getAllUsers);
 app.get('/api/admin/users/:userId', verifyAdminToken, adminAPI.getUserById);
 app.patch('/api/admin/users/:userId/status', verifyAdminToken, adminAPI.updateUserStatus);
 app.patch('/api/admin/users/:userId/password', verifyAdminToken, adminAPI.resetUserPassword);
+app.patch('/api/admin/users/:userId/passcode', verifyAdminToken, adminAPI.resetUserPasscode);
 
 // Initialize system health monitoring
 const systemHealthMonitor = require('./monitoring/systemHealthMonitor');
