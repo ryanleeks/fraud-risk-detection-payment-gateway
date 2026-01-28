@@ -64,6 +64,9 @@ app.post('/api/user/passcode/set', verifyToken, passcodeAPI.setUserPasscode);
 app.post('/api/user/passcode/verify', verifyToken, passcodeAPI.verifyUserPasscode);
 app.post('/api/user/passcode/change', verifyToken, passcodeAPI.changeUserPasscode);
 app.get('/api/user/passcode/status', verifyToken, passcodeAPI.getUserPasscodeStatus);
+app.post('/api/user/passcode/forgot', verifyToken, passcodeAPI.forgotPasscode);
+app.post('/api/user/passcode/verify-otp', verifyToken, passcodeAPI.verifyPasscodeOtp);
+app.post('/api/user/passcode/reset', verifyToken, passcodeAPI.resetUserPasscode);
 
 // Payment routes (protected)
 app.post('/api/payment/lookup-recipient', verifyToken, user.lookupRecipient);

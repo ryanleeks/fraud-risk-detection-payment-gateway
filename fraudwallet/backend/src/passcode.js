@@ -217,6 +217,32 @@ const changePasscode = async (userId, oldPasscode, newPasscode) => {
 };
 
 /**
+ * Reset transaction passcode (used after OTP verification)
+ * This bypasses the old passcode requirement
+ */
+const resetPasscode = async (userId, newPasscode) => {
+  try {
+    // Validate new passcode format
+    const validation = validatePasscodeFormat(newPasscode);
+    if (!validation.valid) {
+      return { success: false, message: validation.message };
+    }
+
+    // Hash the new passcode
+    const hashedPasscode = await bcrypt.hash(newPasscode, SALT_ROUNDS);
+
+    // Update passcode and clear lockout
+    db.prepare('UPDATE users SET transaction_passcode = ?, passcode_attempts = 0, passcode_locked_until = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(hashedPasscode, userId);
+
+    return { success: true, message: 'Transaction passcode reset successfully' };
+  } catch (error) {
+    console.error('Error resetting passcode:', error);
+    return { success: false, message: 'Failed to reset passcode' };
+  }
+};
+
+/**
  * Get passcode status for a user
  */
 const getPasscodeStatus = (userId) => {
@@ -248,5 +274,6 @@ module.exports = {
   setPasscode,
   verifyPasscode,
   changePasscode,
+  resetPasscode,
   getPasscodeStatus
 };

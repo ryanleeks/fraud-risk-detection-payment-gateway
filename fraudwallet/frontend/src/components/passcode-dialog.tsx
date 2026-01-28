@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Lock, AlertCircle } from "lucide-react"
+import { Lock, AlertCircle, Mail } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ interface PasscodeDialogProps {
   description?: string
   onSubmit: (passcode: string, oldPasscode?: string) => Promise<{ success: boolean; message?: string; locked?: boolean }>
   requireOldPasscode?: boolean
+  showForgotPasscode?: boolean
 }
 
 export function PasscodeDialog({
@@ -33,16 +34,21 @@ export function PasscodeDialog({
   title,
   description,
   onSubmit,
-  requireOldPasscode = false
+  requireOldPasscode = false,
+  showForgotPasscode = true
 }: PasscodeDialogProps) {
   const [passcode, setPasscode] = React.useState("")
   const [oldPasscode, setOldPasscode] = React.useState("")
   const [confirmPasscode, setConfirmPasscode] = React.useState("")
-  const [step, setStep] = React.useState<"old" | "new" | "confirm" | "single">(
+  const [step, setStep] = React.useState<"old" | "new" | "confirm" | "single" | "forgot_otp" | "forgot_new" | "forgot_confirm">(
     mode === "change" ? "old" : mode === "setup" ? "new" : "single"
   )
   const [error, setError] = React.useState("")
+  const [successMessage, setSuccessMessage] = React.useState("")
   const [isLoading, setIsLoading] = React.useState(false)
+  const [otpCode, setOtpCode] = React.useState("")
+  const [resetToken, setResetToken] = React.useState("")
+  const [newPasscode, setNewPasscode] = React.useState("")
 
   // Reset state when dialog opens/closes
   React.useEffect(() => {
@@ -51,7 +57,11 @@ export function PasscodeDialog({
       setOldPasscode("")
       setConfirmPasscode("")
       setError("")
+      setSuccessMessage("")
       setIsLoading(false)
+      setOtpCode("")
+      setResetToken("")
+      setNewPasscode("")
       if (mode === "change") {
         setStep("old")
       } else if (mode === "setup") {
@@ -62,11 +72,136 @@ export function PasscodeDialog({
     }
   }, [open, mode])
 
+  const handleForgotPasscode = async () => {
+    setError("")
+    setSuccessMessage("")
+    setIsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/user/passcode/forgot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccessMessage("Verification code sent to your email")
+        setStep("forgot_otp")
+      } else {
+        setError(data.message || "Failed to send verification code")
+      }
+    } catch (error) {
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    setError("")
+    setSuccessMessage("")
+    setIsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/user/passcode/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: otpCode }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setResetToken(data.resetToken)
+        setStep("forgot_new")
+        setOtpCode("")
+      } else {
+        setError(data.message || "Invalid verification code")
+      }
+    } catch (error) {
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResetPasscode = async () => {
+    setError("")
+    setSuccessMessage("")
+    setIsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/user/passcode/reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          resetToken,
+          newPasscode,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSuccessMessage("Passcode reset successfully!")
+        setTimeout(() => {
+          onOpenChange(false)
+        }, 1500)
+      } else {
+        setError(data.message || "Failed to reset passcode")
+      }
+    } catch (error) {
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setError("")
     setIsLoading(true)
 
     try {
+      // Handle forgot passcode flow
+      if (step === "forgot_otp") {
+        await handleVerifyOtp()
+        return
+      }
+
+      if (step === "forgot_new") {
+        if (newPasscode.length !== 6) {
+          setError("Passcode must be 6 digits")
+          setIsLoading(false)
+          return
+        }
+        setStep("forgot_confirm")
+        setIsLoading(false)
+        return
+      }
+
+      if (step === "forgot_confirm") {
+        if (confirmPasscode !== newPasscode) {
+          setError("Passcodes do not match")
+          setIsLoading(false)
+          return
+        }
+        await handleResetPasscode()
+        return
+      }
+
       if (mode === "setup") {
         // Setup mode - requires new passcode and confirmation
         if (step === "new") {
@@ -158,16 +293,29 @@ export function PasscodeDialog({
 
   const handleBack = () => {
     setError("")
+    setSuccessMessage("")
     if (step === "confirm") {
       setConfirmPasscode("")
       setStep("new")
     } else if (step === "new" && mode === "change") {
       setPasscode("")
       setStep("old")
+    } else if (step === "forgot_otp") {
+      setOtpCode("")
+      setStep("single")
+    } else if (step === "forgot_new") {
+      setNewPasscode("")
+      setStep("forgot_otp")
+    } else if (step === "forgot_confirm") {
+      setConfirmPasscode("")
+      setStep("forgot_new")
     }
   }
 
   const getTitle = () => {
+    if (step === "forgot_otp") return "Verify Email"
+    if (step === "forgot_new") return "New Passcode"
+    if (step === "forgot_confirm") return "Confirm New Passcode"
     if (title) return title
     if (mode === "setup") {
       return step === "new" ? "Set Transaction Passcode" : "Confirm Passcode"
@@ -181,6 +329,9 @@ export function PasscodeDialog({
   }
 
   const getDescription = () => {
+    if (step === "forgot_otp") return "Enter the 6-digit code sent to your email"
+    if (step === "forgot_new") return "Enter your new 6-digit passcode"
+    if (step === "forgot_confirm") return "Re-enter your new passcode to confirm"
     if (description && step === (mode === "verify" ? "single" : "new")) {
       return description
     }
@@ -199,16 +350,23 @@ export function PasscodeDialog({
 
   const getCurrentValue = () => {
     if (step === "old") return oldPasscode
-    if (step === "confirm") return confirmPasscode
+    if (step === "confirm" || step === "forgot_confirm") return confirmPasscode
+    if (step === "forgot_otp") return otpCode
+    if (step === "forgot_new") return newPasscode
     return passcode
   }
 
   const handleValueChange = (value: string) => {
     setError("")
+    setSuccessMessage("")
     if (step === "old") {
       setOldPasscode(value)
-    } else if (step === "confirm") {
+    } else if (step === "confirm" || step === "forgot_confirm") {
       setConfirmPasscode(value)
+    } else if (step === "forgot_otp") {
+      setOtpCode(value)
+    } else if (step === "forgot_new") {
+      setNewPasscode(value)
     } else {
       setPasscode(value)
     }
@@ -220,15 +378,23 @@ export function PasscodeDialog({
   }
 
   const showBackButton = () => {
-    return (step === "confirm" || (step === "new" && mode === "change")) && !isLoading
+    return (
+      step === "confirm" ||
+      (step === "new" && mode === "change") ||
+      step === "forgot_otp" ||
+      step === "forgot_new" ||
+      step === "forgot_confirm"
+    ) && !isLoading
   }
+
+  const isForgotFlow = step === "forgot_otp" || step === "forgot_new" || step === "forgot_confirm"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
+            {isForgotFlow ? <Mail className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
             {getTitle()}
           </DialogTitle>
           <DialogDescription>{getDescription()}</DialogDescription>
@@ -264,6 +430,23 @@ export function PasscodeDialog({
               <span>{error}</span>
             </div>
           )}
+
+          {successMessage && (
+            <div className="flex items-center gap-2 text-green-600 text-sm">
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          {/* Forgot Passcode Link - only show in verify mode */}
+          {mode === "verify" && step === "single" && showForgotPasscode && !isLoading && (
+            <button
+              type="button"
+              onClick={handleForgotPasscode}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot Passcode?
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2 justify-end">
@@ -273,7 +456,17 @@ export function PasscodeDialog({
             </Button>
           )}
           <Button onClick={handleSubmit} disabled={!canSubmit()}>
-            {isLoading ? "Processing..." : step === "confirm" ? "Confirm" : step === "old" ? "Next" : step === "new" ? "Continue" : "Submit"}
+            {isLoading
+              ? "Processing..."
+              : step === "confirm" || step === "forgot_confirm"
+              ? "Confirm"
+              : step === "old"
+              ? "Next"
+              : step === "new" || step === "forgot_new"
+              ? "Continue"
+              : step === "forgot_otp"
+              ? "Verify"
+              : "Submit"}
           </Button>
         </div>
       </DialogContent>
