@@ -302,8 +302,202 @@ const verify2FA = async (req, res) => {
   }
 };
 
+/**
+ * FORGOT PASSWORD - Request password reset OTP
+ * Steps:
+ * 1. Check if email exists
+ * 2. If yes, generate and send OTP
+ * 3. If no, return error (email not registered)
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate input
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your email address'
+      });
+    }
+
+    // Check if email exists
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'This email is not registered'
+      });
+    }
+
+    // Check if account is terminated
+    if (user.account_status === 'terminated') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been terminated'
+      });
+    }
+
+    // Generate and send OTP
+    const code = generateCode();
+    storeCode(user.id, code, 'password_reset');
+
+    // Send code via email
+    await sendEmailCode(user.email, user.full_name, code);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email',
+      userId: user.id
+    });
+
+    console.log(`✅ Password reset code sent to: ${email}`);
+
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending verification code'
+    });
+  }
+};
+
+/**
+ * VERIFY RESET OTP - Verify OTP for password reset
+ */
+const verifyResetOtp = async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and verification code are required'
+      });
+    }
+
+    // Verify the code
+    const verification = verifyCode(userId, code, 'password_reset');
+
+    if (!verification.valid) {
+      return res.status(401).json({
+        success: false,
+        message: verification.message
+      });
+    }
+
+    // Generate a temporary reset token (valid for 5 minutes)
+    const resetToken = jwt.sign(
+      { userId, purpose: 'password_reset' },
+      process.env.JWT_SECRET || 'default-secret-key',
+      { expiresIn: '5m' }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Code verified successfully',
+      resetToken
+    });
+
+    console.log(`✅ Password reset OTP verified for user ${userId}`);
+
+  } catch (error) {
+    console.error('❌ Verify reset OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying code'
+    });
+  }
+};
+
+/**
+ * RESET PASSWORD - Set new password after OTP verification
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { resetToken, newPassword, confirmPassword } = req.body;
+
+    // Validate input
+    if (!resetToken || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required'
+      });
+    }
+
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+
+    // Check password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+
+    // Verify reset token
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET || 'default-secret-key');
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired reset token. Please request a new code.'
+      });
+    }
+
+    if (decoded.purpose !== 'password_reset') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid reset token'
+      });
+    }
+
+    // Get user
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    // Update password in database
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(passwordHash, user.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully! You can now login with your new password.'
+    });
+
+    console.log(`✅ Password reset successful for: ${user.email}`);
+
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password'
+    });
+  }
+};
+
 module.exports = {
   signup,
   login,
-  verify2FA
+  verify2FA,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword
 };

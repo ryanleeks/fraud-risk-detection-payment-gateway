@@ -40,6 +40,9 @@ const auth = require('./auth');
 app.post('/api/auth/signup', auth.signup);
 app.post('/api/auth/login', auth.login);
 app.post('/api/auth/verify-2fa', auth.verify2FA);
+app.post('/api/auth/forgot-password', auth.forgotPassword);
+app.post('/api/auth/verify-reset-otp', auth.verifyResetOtp);
+app.post('/api/auth/reset-password', auth.resetPassword);
 
 // User profile routes (protected - require authentication)
 const user = require('./user');
