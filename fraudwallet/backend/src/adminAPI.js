@@ -193,9 +193,63 @@ const resetUserPassword = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/admin/users/:userId/passcode
+ * Reset user transaction passcode
+ */
+const resetUserPasscode = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newPasscode } = req.body;
+
+    // Validate input - must be 6 digits
+    if (!newPasscode || !/^\d{6}$/.test(newPasscode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passcode must be exactly 6 digits'
+      });
+    }
+
+    // Check if user exists
+    const user = db.prepare('SELECT id, email, transaction_passcode FROM users WHERE id = ?').get(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Hash new passcode
+    const passcodeHash = await bcrypt.hash(newPasscode, SALT_ROUNDS);
+
+    // Update passcode and clear any lockout
+    db.prepare(`
+      UPDATE users
+      SET transaction_passcode = ?, passcode_attempts = 0, passcode_locked_until = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(passcodeHash, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Transaction passcode reset successfully'
+    });
+
+    console.log(`✅ Admin reset passcode for user ${user.email}`);
+
+  } catch (error) {
+    console.error('❌ Error resetting passcode:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting passcode'
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
   updateUserStatus,
-  resetUserPassword
+  resetUserPassword,
+  resetUserPasscode
 };
